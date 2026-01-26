@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DdlMappings">
+    <mapping uuid="79fd61b5-a0ab-45a2-a7da-db2a59494a90" name="@localhost Mapping">
+      <data-sources db="4279aade-11db-4f28-bcfc-1d3f258654d0" ddl="570a6f1a-0f24-411e-8c84-bd6d164f2e1f" />
+      <scope>
+        <node kind="database" negative="1" />
+      </scope>
+    </mapping>
+  </component>
+  <component name="SqlDataSourceStorage">
+    <option name="dataSources">
+      <list>
+        <State>
+          <option name="id" value="570a6f1a-0f24-411e-8c84-bd6d164f2e1f" />
+          <option name="name" value="DDL data source" />
+          <option name="dbmsName" value="ORACLE" />
+          <option name="urls">
+            <array>
+              <option value="file://$PROJECT_DIR$/schema" />
+            </array>
+          </option>
+          <option name="outLayout" value="File per object by schema.groovy" />
+        </State>
+      </list>
+    </option>
+  </component>
+</project>
