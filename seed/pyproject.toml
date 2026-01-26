@@ -1,0 +1,8 @@
+[project]
+name = "online-food-ordering-system-seed"
+version = "0.1.0"
+description = "Seeding script for populating the database"
+requires-python = ">=3.14"
+dependencies = [
+    "polars"
+]
