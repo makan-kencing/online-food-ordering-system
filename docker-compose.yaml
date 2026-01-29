@@ -1,15 +1,11 @@
 services:
     db:
-        # https://hub.docker.com/r/gvenzl/oracle-xe
-        image: gvenzl/oracle-xe:11
+        image: container-registry.oracle.com/database/free:latest-lite
         ports:
             - "1521:1521"
         environment:
-          ORACLE_RANDOM_PASSWORD: true
           APP_USER: ${DB_USERNAME}
           APP_USER_PASSWORD: ${DB_PASSWORD}
         volumes:
-            - oracle-data:/u01/app/oracle/oradata
-
-volumes:
-    oracle-data:
+            - ./var/oracle-data:/opt/oracle/oradata
+            - ./deploy/oracle/startup:/opt/oracle/scripts/startup

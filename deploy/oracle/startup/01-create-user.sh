@@ -1,0 +1,12 @@
+set -Eeuo pipefail
+
+sqlplus -s / as sysdba << EOF
+   -- Exit on any errors
+   WHENEVER SQLERROR EXIT SQL.SQLCODE
+
+   ALTER SESSION SET CONTAINER=FREEPDB1;
+
+   CREATE USER ${APP_USER} IDENTIFIED BY "${APP_USER_PASSWORD}";
+   GRANT DB_DEVELOPER_ROLE TO ${APP_USER};
+   exit;
+EOF
