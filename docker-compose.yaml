@@ -1,6 +1,6 @@
 services:
     db:
-        image: container-registry.oracle.com/database/free:latest-lite
+        build: src/db
         ports:
             - "1521:1521"
         environment:
@@ -8,4 +8,8 @@ services:
           APP_USER_PASSWORD: ${DB_PASSWORD}
         volumes:
             - ./var/oracle-data:/opt/oracle/oradata
-            - ./deploy/oracle/startup:/opt/oracle/scripts/startup
+#    seeder:
+#        build: src/seeder
+#        environment:
+#            TARGET_HOST: db
+#            TARGET_PORT: 1521

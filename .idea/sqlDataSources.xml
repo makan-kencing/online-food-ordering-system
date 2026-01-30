@@ -17,7 +17,7 @@
           <option name="dbmsName" value="ORACLE" />
           <option name="urls">
             <array>
-              <option value="file://$PROJECT_DIR$/schema" />
+              <option value="file://$PROJECT_DIR$/src/db/schema" />
             </array>
           </option>
           <option name="outLayout" value="File per object by schema.groovy" />
