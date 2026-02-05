@@ -1,13 +1,21 @@
 services:
     db:
-        build: src/db
+        image: gvenzl/oracle-free:latest
         ports:
             - "1521:1521"
         environment:
-          APP_USER: ${DB_USERNAME}
-          APP_USER_PASSWORD: ${DB_PASSWORD}
+            ORACLE_RANDOM_PASSWORD: yes
+            APP_USER: ${DB_USERNAME}
+            APP_USER_PASSWORD: ${DB_PASSWORD}
         volumes:
             - ./var/oracle-data:/opt/oracle/oradata
+        healthcheck:
+            test: [ "CMD", "healthcheck.sh" ]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 5s
+            start_interval: 5s
 #    seeder:
 #        build: src/seeder
 #        environment:
