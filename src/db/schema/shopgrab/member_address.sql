@@ -1,7 +1,7 @@
 CREATE TABLE member_address
 (
     member_id  INT REFERENCES member (id),
-    address_id INT REFERENCES address (id),
+    address_id INT REFERENCES address (id) UNIQUE,
     is_primary BOOLEAN DEFAULT FALSE NOT NULL,
     PRIMARY KEY (member_id, address_id)
 );
