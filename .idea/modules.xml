@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/online-food-ordering-system.iml" filepath="$PROJECT_DIR$/.idea/online-food-ordering-system.iml" />
+      <module fileurl="file://$PROJECT_DIR$/src/seeder/.idea/seeder.iml" filepath="$PROJECT_DIR$/src/seeder/.idea/seeder.iml" />
     </modules>
   </component>
 </project>
