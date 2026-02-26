@@ -5,5 +5,6 @@ CREATE TABLE voucher
     description VARCHAR(200)                        NOT NULl,
     usage_limit INT CHECK ( usage_limit > 0 ),
     from_date   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    thru_date   TIMESTAMP CHECK ( thru_date > from_date )
+    thru_date   TIMESTAMP,
+    CHECK ( thru_date is null or thru_date > from_date )
 );

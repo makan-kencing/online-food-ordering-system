@@ -10,7 +10,7 @@ CREATE TABLE price_component
     id                  INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     price_type          price_type                          NOT NULL,
     from_date           TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    thru_date           TIMESTAMP CHECK ( thru_date > from_date ),
+    thru_date           TIMESTAMP,
     description         VARCHAR(200)                        NOT NULL,
     amount              DECIMAL CHECK ( amount > 0 ),
     percentage          DECIMAL(5, 4) CHECK ( percentage > 0 AND percentage < 1 ),
@@ -22,5 +22,6 @@ CREATE TABLE price_component
     membership_id       INT REFERENCES membership (id),
     voucher_id          INT REFERENCES voucher (id),
     vendor_id           INT REFERENCES delivery_vendor (id),
-    CHECK ( amount IS NULL != percentage IS NULL )
+    CHECK ( amount IS NULL != percentage IS NULL ),
+    CHECK ( thru_date is null or thru_date > from_date )
 );

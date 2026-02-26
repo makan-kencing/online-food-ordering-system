@@ -5,6 +5,7 @@ CREATE TABLE menu
     category_id    INT REFERENCES menu_category (id),
     is_unavailable BOOLEAN   DEFAULT FALSE             NOT NULL,
     from_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    thru_date      TIMESTAMP CHECK ( thru_date > from_date ),
-    PRIMARY KEY (product_id, restaurant_id)
+    thru_date      TIMESTAMP,
+    PRIMARY KEY (product_id, restaurant_id),
+    CHECK ( thru_date is null or thru_date > from_date )
 );
