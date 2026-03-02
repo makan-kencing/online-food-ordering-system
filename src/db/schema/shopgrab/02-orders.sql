@@ -4,7 +4,7 @@ CREATE DOMAIN order_type AS ENUM
    PICKUP
 );
 
-CREATE TABLE "order"
+CREATE TABLE orders
 (
     id         INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     member_id  INT REFERENCES member (id)          NOT NULL,

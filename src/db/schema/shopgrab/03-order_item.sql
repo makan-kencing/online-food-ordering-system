@@ -1,7 +1,7 @@
 CREATE TABLE order_item
 (
     id                    INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    order_id              INT REFERENCES "order" (id)      NOT NULL,
+    order_id              INT REFERENCES orders (id)      NOT NULL,
     product_id            INT REFERENCES product (id)      NOT NULL,
     product_feature_id    INT REFERENCES product_feature (id),
     feature_order_item_id INT REFERENCES order_item (id), -- used to denote the order line item the feature is applied to
