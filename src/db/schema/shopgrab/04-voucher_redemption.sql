@@ -1,6 +1,6 @@
 CREATE TABLE voucher_redemption
 (
-    voucher_distribution_id INT REFERENCES voucher_distribution (id),
+    voucher_distribution_id INT REFERENCES voucher_distribution (id) UNIQUE,
     invoice_id              INT REFERENCES invoice (id),
     PRIMARY KEY (voucher_distribution_id, invoice_id)
 );
