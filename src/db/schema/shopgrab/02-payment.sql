@@ -5,5 +5,5 @@ CREATE TABLE payment
     paid_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     ref_no              VARCHAR(200)                        NOT NULL,
     amount              DECIMAL CHECK ( amount > 0 )        NOT NULL,
-    payment_method_date JSON                                NOT NULL
+    payment_method_data JSON                                NOT NULL
 );
