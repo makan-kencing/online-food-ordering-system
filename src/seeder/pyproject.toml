@@ -4,5 +4,19 @@ version = "0.1.0"
 description = "Seeding script for populating the database"
 requires-python = ">=3.14"
 dependencies = [
-    "polars"
+    "polars",
+    "sqlalchemy",
+    "oracledb",
+    "asyncio",
+    "click",
+    "faker",
+    "factory-boy",
+    "ipykernel",
 ]
+
+[project.scripts]
+seed = "online_food_ordering_system_seeder:cli.seed"
+
+[build-system]
+requires = ["uv_build>=0.10.6,<0.11.0"]
+build-backend = "uv_build"

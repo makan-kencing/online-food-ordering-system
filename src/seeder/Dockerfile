@@ -17,4 +17,9 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
-#CMD ["uv", "run", "main.py"]
+CMD ["uv", "run", "seed",
+        "--host", "${TARGET_HOST}",
+        "--port", "${TARGET_PORT}",
+        "--sid", "${TARGET_SID}",
+        "--username", "${DB_USERNAME}",
+        "--password", "${DB_PASSWORD}"]

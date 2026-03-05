@@ -21,3 +21,7 @@ services:
 #        environment:
 #            TARGET_HOST: db
 #            TARGET_PORT: 1521
+#            DB_USERNAME: ${DB_USERNAME}
+#            DB_PASSWORD: ${DB_PASSWORD}
+#        depends_on:
+#            - db
