@@ -9,5 +9,5 @@ CREATE TABLE restaurant
     opening_hour          INTERVAL DAY(0) TO SECOND(0)        NOT NULL,
     closing_hour          INTERVAL DAY(0) TO SECOND(0)        NOT NULL,
     is_temporarily_closed BOOLEAN   DEFAULT FALSE             NOT NULL,
-    address_id            INT REFERENCES address (id)         NOT NULL
+    address_id            INT REFERENCES address (id) UNIQUE  NOT NULL
 );
