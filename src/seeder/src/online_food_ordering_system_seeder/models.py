@@ -276,6 +276,7 @@ class Restaurant(Base, HasId, HasNameAndDescription):
 
     address: Mapped[Address] = relationship(back_populates="restaurant", single_parent=True)
     menu: Mapped[set[Menu]] = relationship(back_populates="restaurant")
+    priced: Mapped[set[PriceComponent]] = relationship(back_populates="restaurant")
 
 
 class VoucherDistribution(Base, HasId):
@@ -394,6 +395,7 @@ class PriceComponent(Base, HasId):
     product: Mapped[Product | None] = relationship(back_populates="priced")
     product_feature: Mapped[ProductFeature | None] = relationship(back_populates="priced")
     product_category: Mapped[ProductCategory | None] = relationship(back_populates="priced")
+    restaurant: Mapped[Restaurant | None] = relationship(back_populates="priced")
     quantity_break: Mapped[QuantityBreak | None] = relationship(back_populates="priced")
     order_value: Mapped[OrderValue | None] = relationship(back_populates="priced")
     membership: Mapped[Membership | None] = relationship(back_populates="priced")
