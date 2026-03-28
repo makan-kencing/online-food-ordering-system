@@ -1,4 +1,4 @@
--- Queries
+-- Queries -1
 -- Check the membership for the register member is active or expired
 CREATE VIEW membership_status_list AS
 SELECT
@@ -13,7 +13,7 @@ FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 GROUP BY m.id, m.username;
 
--- Queries
+-- Queries -2
 -- check the nearby expired membership subscription of each member
 -- (will check the subscription data that nearby the expired date one week)
 CREATE VIEW VW_UPCOMING_EXPIRATIONS AS
@@ -29,7 +29,7 @@ WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
 CREATE OR REPLACE PROCEDURE
 
 
--- Trigger
+-- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
 -- Why using the compound trigger is bc Mutating-Table Error .
 CREATE OR REPLACE TRIGGER TRG_SET_Default_Address
@@ -69,7 +69,8 @@ COMPOUND TRIGGER
 
 END;
 
---REPORT
+
+--REPORT -1 ：Yearly_Membership_Subscription_Report
 CREATE OR REPLACE PROCEDURE yearly_membership_subscription_report (v_report_date IN DATE) IS
     v_target_year     NUMBER := EXTRACT(YEAR FROM v_report_date);
     v_membership_id   MEMBERSHIP.ID%TYPE;
@@ -148,7 +149,103 @@ BEGIN
     CLOSE memTypeCursor;
 END;
 
+--REPORT -2 ：monthly_payment_method_using_summary_report
+ CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (v_report_date IN DATE) IS
 
+    v_target_year     NUMBER := EXTRACT(YEAR FROM v_report_date);
+    v_target_month    NUMBER := EXTRACT(MONTH FROM v_report_date);
+    v_pay_method_id   PAYMENT_METHOD.ID%TYPE;
+    v_pay_method_name PAYMENT_METHOD.NAME%TYPE;
+
+    v_subtotal_qty    NUMBER;
+    v_subtotal_rev    NUMBER;
+    v_grand_total_qty NUMBER := 0;
+    v_grand_total_rev NUMBER := 0;
+
+    v_max_qty         NUMBER := -1;
+    v_best_method     VARCHAR2(100) := 'N/A';
+
+    v_line_width      CONSTANT NUMBER := 70;
+
+    CURSOR payMetTypeCursor IS
+        SELECT ID, NAME FROM PAYMENT_METHOD ORDER BY ID;
+
+    CURSOR payDetailCursor IS
+        SELECT ID, REF_NO, PAID_AT, AMOUNT
+        FROM PAYMENT
+        WHERE PAYMENT_METHOD_ID = v_pay_method_id
+          AND EXTRACT(YEAR FROM PAID_AT) = v_target_year
+          AND EXTRACT(MONTH FROM PAID_AT) = v_target_month
+        ORDER BY PAID_AT;
+
+    payRec payDetailCursor%ROWTYPE;
+
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 12) || 'MONTHLY PAYMENT METHOD SUMMARY: ' || v_target_year || '-' || LPAD(v_target_month, 2, '0') || LPAD(' ', 12) || '|');
+    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+
+    OPEN payMetTypeCursor;
+    LOOP
+        FETCH payMetTypeCursor INTO v_pay_method_id, v_pay_method_name;
+        EXIT WHEN payMetTypeCursor%NOTFOUND;
+
+        v_subtotal_qty := 0;
+        v_subtotal_rev := 0;
+
+        DBMS_OUTPUT.PUT_LINE('METHOD: ' || v_pay_method_name);
+        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+        DBMS_OUTPUT.PUT_LINE(RPAD('PAY_ID', 10) || RPAD('REF_NO', 20) || RPAD('PAID_AT', 20) || LPAD('AMOUNT', 20));
+        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+
+        OPEN payDetailCursor;
+        LOOP
+            FETCH payDetailCursor INTO payRec;
+            EXIT WHEN payDetailCursor%NOTFOUND;
+
+            DBMS_OUTPUT.PUT_LINE(
+                RPAD(payRec.ID, 10) ||
+                RPAD(payRec.REF_NO, 20) ||
+                RPAD(TO_CHAR(payRec.PAID_AT, 'YYYY-MM-DD'), 20) ||
+                LPAD(TO_CHAR(payRec.AMOUNT, '$99,990.00'), 20)
+            );
+
+            v_subtotal_qty := v_subtotal_qty + 1;
+            v_subtotal_rev := v_subtotal_rev + payRec.AMOUNT;
+        END LOOP;
+
+        IF v_subtotal_qty > v_max_qty THEN
+            v_max_qty := v_subtotal_qty;
+            v_best_method := v_pay_method_name;
+        END IF;
+
+        IF payDetailCursor%ROWCOUNT > 0 THEN
+            DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+            DBMS_OUTPUT.PUT_LINE(RPAD('SUB TOTAL (' || v_pay_method_name || ')', 30) ||
+                                 'COUNT: ' || RPAD(v_subtotal_qty, 13) ||
+                                 LPAD(TO_CHAR(v_subtotal_rev, '$99,990.00'), 20));
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('** NO TRANSACTIONS THIS MONTH **');
+        END IF;
+        DBMS_OUTPUT.PUT_LINE(CHR(5));
+        v_grand_total_qty := v_grand_total_qty + v_subtotal_qty;
+        v_grand_total_rev := v_grand_total_rev + v_subtotal_rev;
+        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+        CLOSE payDetailCursor;
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+
+    DBMS_OUTPUT.PUT_LINE(RPAD('MOST USED METHOD', 45) || ' : ' || LPAD(v_best_method || ' ' || v_max_qty || ' times', 22));
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+
+    DBMS_OUTPUT.PUT_LINE(RPAD('GRAND TOTAL TRANSACTIONS', 45) || ' : ' || LPAD(v_grand_total_qty, 22));
+    DBMS_OUTPUT.PUT_LINE(RPAD('GRAND TOTAL REVENUE', 45) || ' : ' || LPAD(TO_CHAR(v_grand_total_rev, '$99,990.00'), 22));
+    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD(' ', 50) || '*** END OF REPORT ***');
+
+    CLOSE payMetTypeCursor;
+END;
 
 
 
