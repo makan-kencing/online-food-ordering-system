@@ -94,8 +94,65 @@ EXCEPTION
 END;
 
 --EXEC proc_subscribe_member(10, 40.00, 1);
---PROCEDURE -2 :
+--PROCEDURE -2 :proc_upgrade_membership
+CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
+    p_member_id      IN member.id%TYPE,
+    p_new_membership IN NUMBER,
+    p_pay_amount     IN NUMBER,
+    p_pay_method_id  IN NUMBER
+) AS
+    v_old_sub_id      NUMBER;
+    v_old_expiry      DATE;
+    v_payment_id      NUMBER;
+BEGIN
+    SELECT id, thru_date
+    INTO v_old_sub_id, v_old_expiry
+    FROM monthly_subscription
+    WHERE member_id = p_member_id
+      AND thru_date > CURRENT_TIMESTAMP
+      AND ROWNUM = 1;
 
+    INSERT INTO payment (
+        amount, paid_at, payment_method_id, ref_no, payment_method_data
+    ) VALUES (
+        p_pay_amount, CURRENT_TIMESTAMP, p_pay_method_id, 'UPGRADE',
+        '{"action": "UPGRADE", "from_member_id": ' || p_member_id || '}'
+    )
+    RETURNING id INTO v_payment_id;
+
+    UPDATE monthly_subscription
+    SET thru_date = CURRENT_TIMESTAMP
+    WHERE id = v_old_sub_id;
+
+    INSERT INTO monthly_subscription (
+        membership_id,
+        member_id,
+        from_date,
+        thru_date,
+        payment_id
+    ) VALUES (
+        p_new_membership,
+        p_member_id,
+        CURRENT_TIMESTAMP,
+        ADD_MONTHS(v_old_expiry, 1),
+        v_payment_id
+    );
+
+    COMMIT;
+
+    DBMS_OUTPUT.PUT_LINE('--- Upgrade & Record Saved ---');
+    DBMS_OUTPUT.PUT_LINE('Old sub terminated at: ' || TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI:SS'));
+    DBMS_OUTPUT.PUT_LINE('New sub expires at: ' || TO_CHAR(ADD_MONTHS(v_old_expiry, 1), 'YYYY-MM-DD'));
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20030, 'Error: No active subscription to upgrade.');
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE;
+END;
+--EXEC proc_upgrade_membership(5, 2, 5.00, 1);
 
 -- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
@@ -161,8 +218,6 @@ EXCEPTION
     WHEN NO_DATA_FOUND THEN
         NULL;
 END;
-
-
 
 --REPORT -1 ：Yearly_Membership_Subscription_Report
 CREATE OR REPLACE PROCEDURE yearly_membership_subscription_report (v_report_date IN DATE) IS
