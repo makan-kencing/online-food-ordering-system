@@ -64,7 +64,6 @@ BEGIN
         '{"status": "AUTO_PROCESSED", "source": "PROCEDURE"}'
     )
     RETURNING id, ref_no INTO v_payment_id, v_generated_ref;
-
     v_months_to_add := p_amount / v_unit_price;
 
     INSERT INTO monthly_subscription (
@@ -93,6 +92,8 @@ EXCEPTION
         ROLLBACK;
         RAISE;
 END;
+
+--PROCEDURE -2 :
 
 
 -- Trigger -1
@@ -136,43 +137,6 @@ COMPOUND TRIGGER
 END;
 
 --Trigger -2
-CREATE OR REPLACE TRIGGER trg_subscription_auto_calc
-BEFORE INSERT ON monthly_subscription
-FOR EACH ROW
-DECLARE
-    v_unit_price      NUMBER;      -- Membership base price
-    v_paid_amount     NUMBER;      -- Actual amount paid in Payment table
-    v_months_to_add   NUMBER;      -- Calculated number of subscription months
-    v_remainder       NUMBER;      -- Remainder for amount validation
-BEGIN
-    SELECT amount INTO v_paid_amount
-    FROM payment
-    WHERE id = :NEW.payment_id;
-
-    SELECT price INTO v_unit_price
-    FROM membership
-    WHERE id = :NEW.membership_id;
-
-    v_remainder := MOD(v_paid_amount, v_unit_price);
-
-    IF v_remainder != 0 OR v_paid_amount <= 0 THEN
-        RAISE_APPLICATION_ERROR(-20001,
-            'Payment validation failed: Amount ($' || v_paid_amount ||
-            ') does not match Membership Unit Price ($' || v_unit_price || ').');
-    END IF;
-    v_months_to_add := v_paid_amount / v_unit_price;
-
-    :NEW.thru_date := ADD_MONTHS(:NEW.from_date, v_months_to_add);
-
-    DBMS_OUTPUT.PUT_LINE('Processing: Payment of $' || v_paid_amount ||
-                         ' detected. Auto-subscribing for ' || v_months_to_add || ' month(s).');
-
-EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-        RAISE_APPLICATION_ERROR(-20002, 'Error: Associated Payment Record or Membership Type not found.');
-    WHEN OTHERS THEN
-        RAISE_APPLICATION_ERROR(-20003, 'Subscription Processing Error: ' || SQLERRM);
-END;
 
 
 
