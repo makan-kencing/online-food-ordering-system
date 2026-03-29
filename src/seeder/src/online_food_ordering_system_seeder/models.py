@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum, auto
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import String, Numeric, DateTime, ForeignKey, Interval, Enum as SAEnum, JSON, PrimaryKeyConstraint, \
     UniqueConstraint
@@ -51,6 +51,19 @@ class HasId:
 class HasNameAndDescription:
     name: Mapped[str] = mapped_column(SHORT_STRING)
     description: Mapped[str] = mapped_column(LONG_STRING)
+
+
+class ICanBeCreated(Protocol):
+    created_by_id: Mapped[int]
+    created_by: Mapped[Member]
+
+
+def CanBeCreated(back_populates: str) -> type[ICanBeCreated]:  # noqa
+    class Wrapper(ICanBeCreated):
+        created_by_id: Mapped[int] = mapped_column()
+        created_by: Mapped[Member] = relationship(back_populates=back_populates)
+
+    return Wrapper
 
 
 class Address(Base, HasId):
@@ -445,6 +458,12 @@ class ProductFeatureInteraction(Base, HasId):
     __table_args__ = (
         UniqueConstraint("feature_a_id", "feature_b_id", "product_id"),
     )
+
+
+class Feedback(Base):
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"), primary_key=True)
+    content: Mapped[str] = mapped_column(LONG_STRING)
+    rating: Mapped[int]
 
 
 class OrderItemAdjustment(Base, HasId):
