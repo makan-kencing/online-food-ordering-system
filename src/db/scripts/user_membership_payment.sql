@@ -93,6 +93,7 @@ EXCEPTION
         RAISE;
 END;
 
+--EXEC proc_subscribe_member(10, 40.00, 1);
 --PROCEDURE -2 :
 
 
@@ -136,7 +137,30 @@ COMPOUND TRIGGER
 
 END;
 
---Trigger -2
+--Trigger -2 : trg_check_sub_overlap
+CREATE OR REPLACE TRIGGER trg_check_sub_overlap
+BEFORE INSERT ON monthly_subscription
+FOR EACH ROW
+DECLARE
+    v_current_expiry DATE;
+    v_months_bought  NUMBER;
+BEGIN
+    SELECT MAX(thru_date)
+    INTO v_current_expiry
+    FROM monthly_subscription
+    WHERE member_id = :NEW.member_id;
+
+    IF v_current_expiry IS NOT NULL AND v_current_expiry > :NEW.from_date THEN
+        v_months_bought := ROUND(MONTHS_BETWEEN(:NEW.thru_date, :NEW.from_date));
+        :NEW.from_date := v_current_expiry;
+        :NEW.thru_date := ADD_MONTHS(v_current_expiry, v_months_bought);
+
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        NULL;
+END;
 
 
 
