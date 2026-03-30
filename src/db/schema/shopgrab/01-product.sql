@@ -1,6 +1,6 @@
 CREATE TABLE product
 (
-    id                INT PRIMARY KEY,
+    id                INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     code              VARCHAR(10) UNIQUE                  NOT NULL,
     name              VARCHAR(50)                         NOT NULL,
     description       VARCHAR(200)                        NOT NULL,
