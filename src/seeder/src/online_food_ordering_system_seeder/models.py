@@ -380,6 +380,7 @@ class OrderItem(Base, HasId):
     product: Mapped[Product] = relationship(back_populates="ordered")
     adjustments: Mapped[set[OrderItemAdjustment]] = relationship(back_populates="order_item")
     features: Mapped[set[OrderItemFeature]] = relationship(back_populates="order_item")
+    feedback: Mapped[Feedback | None] = relationship(back_populates="order_item")
 
 
 class PriceComponent(Base, HasId):
@@ -464,6 +465,8 @@ class Feedback(Base):
     order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"), primary_key=True)
     content: Mapped[str] = mapped_column(LONG_STRING)
     rating: Mapped[int]
+
+    order_item = Mapped[OrderItem] = relationship(back_populates="feedback")
 
 
 class OrderItemAdjustment(Base, HasId):
