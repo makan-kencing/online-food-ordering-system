@@ -149,12 +149,15 @@ class Product(Base, HasId, HasNameAndDescription):
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product")
 
 
-class ProductCategory(Base, HasId, HasNameAndDescription):
+class ProductCategory(Base, HasNameAndDescription):
     __tablename__ = "product_category"
 
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("product_category.id"))
+
     products: Mapped[set[ProductCategoryClassification]] = relationship(back_populates="product_category")
-    parent: Mapped[ProductCategoryHierarchy | None] = relationship(back_populates="parent_category")
-    children: Mapped[set[ProductCategoryHierarchy]] = relationship(back_populates="child_category")
+    parent: Mapped[ProductCategory | None] = relationship(back_populates="children")
+    children: Mapped[set[ProductCategory]] = relationship(back_populates="parent", remote_side=[id])
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_category")
 
 
