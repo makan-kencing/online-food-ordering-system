@@ -94,6 +94,7 @@ EXCEPTION
 END;
 
 --EXEC proc_subscribe_member(10, 40.00, 1);
+
 --PROCEDURE -2 :proc_upgrade_membership
 CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
     p_member_id      IN member.id%TYPE,
@@ -191,7 +192,6 @@ COMPOUND TRIGGER
         v_m_ids.DELETE;
         v_a_ids.DELETE;
     END AFTER STATEMENT;
-
 END;
 
 --Trigger -2 : trg_check_sub_overlap
