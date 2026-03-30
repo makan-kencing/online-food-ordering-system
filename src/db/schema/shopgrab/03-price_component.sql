@@ -42,7 +42,7 @@ create trigger trg_autogenerate_price_code
     on price_component
     for each row
 begin
-    :new.code := 'PR' || to_char(current_date, 'yyyymmdd') || lpad(seq_price_daily_index.nextval, 4, '0');
+    :new.code := 'PR' || to_char(current_date, 'yyyymmdd') || lpad(seq_daily_price_index.nextval, 4, '0');
 end;
 /
 
