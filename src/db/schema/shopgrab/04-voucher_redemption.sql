@@ -11,7 +11,7 @@ create trigger t_check_voucher_is_available_to_redeem
     on voucher_redemption
     for each row
 declare
-    v_voucher_id         int;
+    v_voucher_id         voucher.id%type;
     v_within_usage_limit boolean;
     v_within_redeem_time boolean;
     voucher_fully_redeemed exception;
