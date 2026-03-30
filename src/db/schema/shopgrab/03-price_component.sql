@@ -57,8 +57,9 @@ begin
             job_name => 'periodic_reset_daily_price_index',
             job_type => 'STORED_PROCEDURE',
             job_action => 'SHOPGRAB.RESET_DAILY_PRICE_INDEX',
+            start_date => SYSTIMESTAMP,
             repeat_interval => 'FREQ=DAILY;INTERVAL=1;BYHOUR=0',
-            job_style => 'LIGHTWEIGHT',
+            enabled => TRUE,
             comments => 'Job that reset the price_component code sequence every day at midnight'
     );
 end;
