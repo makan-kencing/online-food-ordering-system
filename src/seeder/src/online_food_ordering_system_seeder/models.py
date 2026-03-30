@@ -79,8 +79,8 @@ class Address(Base, HasId):
     postcode: Mapped[str] = mapped_column(String(10))
     country: Mapped[str] = mapped_column(SHORT_STRING)
 
-    member: Mapped[MemberAddress] = relationship(back_populates="address")
-    restaurant: Mapped[Restaurant] = relationship(back_populates="restaurant")
+    member: Mapped[MemberAddress | None] = relationship(back_populates="address")
+    restaurant: Mapped[Restaurant | None] = relationship(back_populates="address")
     deliveries: Mapped[set[Delivery]] = relationship(back_populates="address")
 
 
@@ -222,7 +222,7 @@ class Payment(Base, HasId):
     __tablename__ = "payment"
 
     payment_method_id: Mapped[int] = mapped_column(ForeignKey("payment_method.id"))
-    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now)
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     ref_no: Mapped[str] = mapped_column(LONG_STRING)
     amount: Mapped[Decimal] = mapped_column(Numeric())
     payment_method_data: Mapped[str] = mapped_column(JSON())
@@ -462,11 +462,13 @@ class ProductFeatureInteraction(Base, HasId):
 
 
 class Feedback(Base):
+    __tablename__ = "feedback"
+
     order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"), primary_key=True)
     content: Mapped[str] = mapped_column(LONG_STRING)
     rating: Mapped[int]
 
-    order_item = Mapped[OrderItem] = relationship(back_populates="feedback")
+    order_item: Mapped[OrderItem] = relationship(back_populates="feedback")
 
 
 class OrderItemAdjustment(Base, HasId):
