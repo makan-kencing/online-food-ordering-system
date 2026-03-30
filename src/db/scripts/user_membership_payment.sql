@@ -28,26 +28,25 @@ WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
 --PROCEDURE -1 : proc_subscribe_member
 CREATE OR REPLACE PROCEDURE proc_subscribe_member (
     p_member_id      IN member.id%TYPE,
+    p_membership_id in membership.id%TYPE,
     p_amount         IN NUMBER,
     p_pay_method_id  IN NUMBER
 ) AS
     v_unit_price      NUMBER;
-    v_membership_id   NUMBER;
     v_months_to_add   NUMBER;
     v_payment_id      NUMBER;
     v_generated_ref   VARCHAR2(30);
 BEGIN
-    BEGIN
-        SELECT membership_id, amount
-        INTO v_membership_id, v_unit_price
-        FROM price_component
-        WHERE membership_id IS NOT NULL
-          AND MOD(p_amount, amount) = 0
-          AND CURRENT_TIMESTAMP BETWEEN from_date AND thru_date
-          AND ROWNUM = 1;
+   BEGIN
+        SELECT price INTO v_unit_price
+        FROM membership
+        WHERE id = p_membership_id;
+        IF p_amount <= 0 OR MOD(p_amount, v_unit_price) != 0 THEN
+             RAISE_APPLICATION_ERROR(-20001, 'Invalid amount. Must be a' || v_unit_price ||'or multiple of '|| v_unit_price );
+        END IF;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20001, 'Invalid amount or no active pricing found.');
+            RAISE_APPLICATION_ERROR(-20002, 'Membership ID not found.');
     END;
 
     INSERT INTO payment (
@@ -73,7 +72,7 @@ BEGIN
         thru_date,
         payment_id
     ) VALUES (
-        v_membership_id,
+         p_membership_id,
         p_member_id,
         CURRENT_TIMESTAMP,
         ADD_MONTHS(CURRENT_TIMESTAMP, v_months_to_add),
@@ -93,7 +92,7 @@ EXCEPTION
         RAISE;
 END;
 
---EXEC proc_subscribe_member(10, 40.00, 1);
+--EXEC proc_subscribe_member(9,1, 50.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
 CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
@@ -395,6 +394,3 @@ BEGIN
 
     CLOSE payMetTypeCursor;
 END;
-
-
-
