@@ -213,7 +213,7 @@ class Orders(Base, HasId):
     ordered_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     order_type: Mapped[OrderType] = mapped_column(SAEnum(OrderType))
 
-    member: Mapped[Member] = relationship(back_populates="order")
+    member: Mapped[Member] = relationship(back_populates="orders")
     delivery: Mapped[Delivery | None] = relationship(back_populates="order")
     invoice: Mapped[Invoice | None] = relationship(back_populates="order")
     items: Mapped[set[OrderItem]] = relationship(back_populates="order")
@@ -252,20 +252,6 @@ class ProductCategoryClassification(Base):
     )
 
 
-class ProductCategoryHierarchy(Base):
-    __tablename__ = "product_category_hierarchy"
-
-    parent_category_id: Mapped[int] = mapped_column(ForeignKey("product_category.id"))
-    child_category_id: Mapped[int] = mapped_column(ForeignKey("product_category.id"))
-
-    parent_category: Mapped[ProductCategory] = relationship(back_populates="parent")
-    child_category: Mapped[ProductCategory] = relationship(back_populates="children")
-
-    __table_args__ = (
-        PrimaryKeyConstraint("parent_category_id", "child_category_id"),
-    )
-
-
 class ProductFeature(Base, HasId, HasNameAndDescription):
     __tablename__ = "product_feature"
 
@@ -273,9 +259,7 @@ class ProductFeature(Base, HasId, HasNameAndDescription):
 
     category: Mapped[ProductFeatureCategory] = relationship(back_populates="product_features")
     products: Mapped[set[ProductFeatureApplicability]] = relationship(back_populates="product_feature")
-    interact_with: Mapped[set[ProductFeatureInteraction]] = relationship(back_populates="feature_a")
-    interacted_by: Mapped[set[ProductFeatureInteraction]] = relationship(back_populates="feature_b")
-    order_items: Mapped[set[OrderItem]] = relationship(back_populates="product_feature")
+    order_item_features: Mapped[set[OrderItemFeature]] = relationship(back_populates="product_feature")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_feature")
 
 
@@ -403,11 +387,12 @@ class PriceComponent(Base, HasId):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("product.id"))
     product_feature_id: Mapped[int | None] = mapped_column(ForeignKey("product_feature.id"))
     product_category_id: Mapped[int | None] = mapped_column(ForeignKey("product_category.id"))
+    restaurant_id: Mapped[int | None] = mapped_column(ForeignKey("restaurant.id"))
     quantity_break_id: Mapped[int | None] = mapped_column(ForeignKey("quantity_break.id"))
     order_value_id: Mapped[int | None] = mapped_column(ForeignKey("order_value.id"))
     membership_id: Mapped[int | None] = mapped_column(ForeignKey("membership.id"))
     voucher_id: Mapped[int | None] = mapped_column(ForeignKey("voucher.id"))
-    vendor_id: Mapped[int | None] = mapped_column(ForeignKey("vendor.id"))
+    vendor_id: Mapped[int | None] = mapped_column(ForeignKey("delivery_vendor.id"))
 
     product: Mapped[Product | None] = relationship(back_populates="priced")
     product_feature: Mapped[ProductFeature | None] = relationship(back_populates="priced")
@@ -455,8 +440,8 @@ class ProductFeatureInteraction(Base, HasId):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("product.id"))
     interaction_type: Mapped[InteractionType] = mapped_column(SAEnum(InteractionType))
 
-    feature_a: Mapped[ProductFeature] = relationship(back_populates="interact_with")
-    feature_b: Mapped[ProductFeature] = relationship(back_populates="interacted_by")
+    feature_a: Mapped[ProductFeature] = relationship(foreign_keys=[feature_a_id])
+    feature_b: Mapped[ProductFeature] = relationship(foreign_keys=[feature_b_id])
     product: Mapped[Product | None] = relationship(back_populates="product_feature_interactions")
 
     __table_args__ = (
@@ -504,8 +489,8 @@ class OrderItemFeature(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric())
     remarks: Mapped[int | None] = mapped_column(SHORT_STRING)
 
-    product_feature: Mapped[ProductFeature] = relationship(back_populates="order_items")
-    order_item: Mapped[OrderItem] = relationship(back_populates="")
+    product_feature: Mapped[ProductFeature] = relationship(back_populates="order_item_features")
+    order_item: Mapped[OrderItem] = relationship(back_populates="features")
 
     __table_args__ = (
         PrimaryKeyConstraint("product_feature_id", "order_item_id"),
