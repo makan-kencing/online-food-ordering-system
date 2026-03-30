@@ -218,84 +218,106 @@ EXCEPTION
         NULL;
 END;
 
---REPORT -1 ：Yearly_Membership_Subscription_Report
-CREATE OR REPLACE PROCEDURE yearly_membership_subscription_report (v_report_date IN DATE) IS
-    v_target_year     NUMBER := EXTRACT(YEAR FROM v_report_date);
-    v_membership_id   MEMBERSHIP.ID%TYPE;
-    v_membership_name MEMBERSHIP.NAME%TYPE;
-    v_subtotal_qty    NUMBER;
-    v_subtotal_rev    NUMBER;
-    v_grand_total_qty NUMBER := 0;
-    v_grand_total_rev NUMBER := 0;
-    v_line_width      CONSTANT NUMBER := 65;
+--REPORT -1 ：proc_annual_membership_report
+CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year IN NUMBER) IS
+    v_year              NUMBER := p_report_year;
+    v_m_conversion      NUMBER;
 
-    CURSOR memTypeCursor IS
-        SELECT ID, NAME FROM MEMBERSHIP ORDER BY ID;
-    CURSOR subCursor IS
-        SELECT TO_CHAR(p.paid_at, 'MM') AS pay_month, COUNT(s.id) AS qty, SUM(p.amount) AS revenue
-        FROM monthly_subscription s
-        JOIN payment p ON s.payment_id = p.id
-        WHERE s.membership_id = v_membership_id AND EXTRACT(YEAR FROM p.paid_at) = v_target_year
-        GROUP BY TO_CHAR(p.paid_at, 'MM') ORDER BY pay_month;
+    v_grand_new_join    NUMBER := 0;
+    v_grand_new_sub     NUMBER := 0;
+    v_grand_total_rev   NUMBER := 0;
 
-    subRec subCursor%ROWTYPE;
+    v_line_width        CONSTANT NUMBER := 95;
+    v_month_id          NUMBER;
+
+    CURSOR cur_months IS
+        SELECT LEVEL as month_num FROM DUAL CONNECT BY LEVEL <= 12;
+
+    CURSOR cur_monthly_stats (p_y NUMBER, p_m NUMBER) IS
+        SELECT
+            (SELECT COUNT(*) FROM member
+             WHERE EXTRACT(YEAR FROM created_at) = p_y
+               AND EXTRACT(MONTH FROM created_at) = p_m) as new_join,-- this is for get the new monthly join member
+            (SELECT COUNT(DISTINCT s.member_id)
+             FROM monthly_subscription s
+             JOIN member m ON s.member_id = m.id
+             WHERE EXTRACT(YEAR FROM s.from_date) = p_y
+               AND EXTRACT(MONTH FROM s.from_date) = p_m
+               AND EXTRACT(YEAR FROM m.created_at) = p_y
+               AND EXTRACT(MONTH FROM m.created_at) = p_m) as new_subs, -- and the new member have subscript the membership or not
+            (SELECT NVL(SUM(amount), 0) FROM payment
+             WHERE EXTRACT(YEAR FROM paid_at) = p_y
+               AND EXTRACT(MONTH FROM paid_at) = p_m) as subtotal
+        FROM DUAL;
+
+    rec_stats cur_monthly_stats%ROWTYPE;
+
 BEGIN
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 11) || 'YEARLY MEMBERSHIP SUBSCRIPTION REPORT - ' || v_target_year || LPAD(' ', 8) || '|');
+    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 20) || 'ANNUAL NEW MEMBER CONVERSION REPORT: ' || v_year || LPAD(' ', 22) || '|');
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
 
-    OPEN memTypeCursor;
+    DBMS_OUTPUT.PUT_LINE(
+        RPAD('MONTH', 12) ||
+        RPAD('NEW JOIN (FREE)', 20) ||
+        RPAD('NEW SUBS (PAID)', 20) ||
+        RPAD('MONTHLY REV', 20) ||
+        'CONVERSION (八仙)'
+    );
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+
+    OPEN cur_months;
     LOOP
-        FETCH memTypeCursor INTO v_membership_id, v_membership_name;
-        EXIT WHEN memTypeCursor%NOTFOUND;
+        FETCH cur_months INTO v_month_id;
+        EXIT WHEN cur_months%NOTFOUND;
 
-        v_subtotal_qty := 0;
-        v_subtotal_rev := 0;
+        OPEN cur_monthly_stats(v_year, v_month_id);
+        FETCH cur_monthly_stats INTO rec_stats;
+        CLOSE cur_monthly_stats;
 
-        DBMS_OUTPUT.PUT_LINE('MEMBERSHIP TYPE: ' || v_membership_name);
-        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-        DBMS_OUTPUT.PUT_LINE(RPAD('MONTH', 20) || RPAD('QUANTITY', 20) || LPAD('REVENUE', 25));
-        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-
-        OPEN subCursor;
-        LOOP
-            FETCH subCursor INTO subRec;
-            EXIT WHEN subCursor%NOTFOUND;
-
-            DBMS_OUTPUT.PUT_LINE(
-                RPAD(subRec.pay_month, 20) ||
-                RPAD(subRec.qty, 20) ||
-                LPAD(TO_CHAR(subRec.revenue, '$99,990.00'), 25)
-            );
-
-            v_subtotal_qty := v_subtotal_qty + subRec.qty;
-            v_subtotal_rev := v_subtotal_rev + subRec.revenue;
-        END LOOP;
-
-        IF subCursor%ROWCOUNT > 0 THEN
-            DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-            DBMS_OUTPUT.PUT_LINE(RPAD('SUB TOTAL (' || v_membership_name || ')', 20) ||
-                                 RPAD(v_subtotal_qty, 20) ||
-                                 LPAD(TO_CHAR(v_subtotal_rev, '$99,990.00'), 25));
+        IF rec_stats.new_join > 0 THEN
+            v_m_conversion := (rec_stats.new_subs / rec_stats.new_join) * 100;
         ELSE
-            DBMS_OUTPUT.PUT_LINE('** NO DATA FOUND **');
+            v_m_conversion := 0;
         END IF;
 
-        DBMS_OUTPUT.PUT_LINE(RPAD('.', v_line_width, '.'));
+        DBMS_OUTPUT.PUT_LINE(
+            RPAD(TO_CHAR(TO_DATE(v_month_id, 'MM'), 'Month'), 12) ||
+            RPAD(rec_stats.new_join, 20) ||
+            RPAD(rec_stats.new_subs, 20) ||
+            RPAD('RM ' || TO_CHAR(rec_stats.subtotal, '99,990.00'), 20) ||
+            TO_CHAR(v_m_conversion, '990.99') || '%'
+        );
 
-        v_grand_total_qty := v_grand_total_qty + v_subtotal_qty;
-        v_grand_total_rev := v_grand_total_rev + v_subtotal_rev;
-
-        CLOSE subCursor;
+        v_grand_new_join  := v_grand_new_join + rec_stats.new_join;
+        v_grand_new_sub   := v_grand_new_sub + rec_stats.new_subs;
+        v_grand_total_rev := v_grand_total_rev + rec_stats.subtotal;
     END LOOP;
+    CLOSE cur_months;
+
+    --This is for Grand Summary
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(RPAD('GRAND TOTAL QUANTITY', 40) || ' : ' || LPAD(v_grand_total_qty, 20));
-    DBMS_OUTPUT.PUT_LINE(RPAD('GRAND TOTAL REVENUE', 40) || ' : ' || LPAD(TO_CHAR(v_grand_total_rev, '$99,990.00'), 20));
-    DBMS_OUTPUT.PUT_LINE(RPAD('TOTAL CATEGORIES', 40) || ' : ' || LPAD(memTypeCursor%ROWCOUNT, 20));
+    DBMS_OUTPUT.PUT_LINE('YEARLY GRAND SUMMARY (' || v_year || '):');
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+    DBMS_OUTPUT.PUT_LINE(RPAD('1. Total New Members (Free Join)', 50) || ': ' || LPAD(v_grand_new_join, 20));
+    DBMS_OUTPUT.PUT_LINE(RPAD('2. Total New Subscriptions (Paid)', 50) || ': ' || LPAD(v_grand_new_sub, 20));
+    DBMS_OUTPUT.PUT_LINE(RPAD('3. Grand Total Revenue', 50) || ': ' || LPAD('RM ' || TO_CHAR(v_grand_total_rev, '999,990.00'), 20));
+
+    IF v_grand_new_join > 0 THEN
+        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate (八仙)', 50) || ': ' ||
+            LPAD(TO_CHAR((v_grand_new_sub / v_grand_new_join) * 100, '990.99') || '%', 20));
+    ELSE
+        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate (八仙)', 50) || ': ' || LPAD('0.00%', 20));
+    END IF;
+
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD(' ', 23) || '*** END OF REPORT ***');
-    CLOSE memTypeCursor;
+    DBMS_OUTPUT.PUT_LINE(LPAD(' ', 65) || '*** END OF REPORT ***');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR GENERATING REPORT: ' || SQLERRM);
 END;
+
 
 --REPORT -2 ：monthly_payment_method_using_summary_report
  CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (v_report_date IN DATE) IS
@@ -394,3 +416,4 @@ BEGIN
 
     CLOSE payMetTypeCursor;
 END;
+
