@@ -218,7 +218,9 @@ EXCEPTION
         NULL;
 END;
 
---REPORT -1 ：proc_annual_membership_report
+-- SQL> SET LINESIZE 150;
+-- SQL> SET PAGESIZE 400;
+--REPORT -1 ： proc_new_member_conversion_analysis
 CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year IN NUMBER) IS
     v_year              NUMBER := p_report_year;
     v_m_conversion      NUMBER;
@@ -254,7 +256,7 @@ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year I
 
 BEGIN
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 20) || 'ANNUAL NEW MEMBER CONVERSION REPORT: ' || v_year || LPAD(' ', 22) || '|');
+    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 20) || 'ANNUAL NEW MEMBER CONVERSION REPORT: ' || v_year || LPAD(' ', 32) || '|');
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
 
     DBMS_OUTPUT.PUT_LINE(
@@ -262,7 +264,7 @@ BEGIN
         RPAD('NEW JOIN (FREE)', 20) ||
         RPAD('NEW SUBS (PAID)', 20) ||
         RPAD('MONTHLY REV', 20) ||
-        'CONVERSION (八仙)'
+        'CONVERSION '
     );
     DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
@@ -304,10 +306,10 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE(RPAD('3. Grand Total Revenue', 50) || ': ' || LPAD('RM ' || TO_CHAR(v_grand_total_rev, '999,990.00'), 20));
 
     IF v_grand_new_join > 0 THEN
-        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate (八仙)', 50) || ': ' ||
+        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate ', 50) || ': ' ||
             LPAD(TO_CHAR((v_grand_new_sub / v_grand_new_join) * 100, '990.99') || '%', 20));
     ELSE
-        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate (八仙)', 50) || ': ' || LPAD('0.00%', 20));
+        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate ', 50) || ': ' || LPAD('0.00%', 20));
     END IF;
 
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
