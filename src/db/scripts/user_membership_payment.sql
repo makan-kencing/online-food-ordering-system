@@ -35,6 +35,7 @@ CREATE OR REPLACE PROCEDURE proc_subscribe_member (
     v_unit_price      NUMBER;
     v_months_to_add   NUMBER;
     v_payment_id      NUMBER;
+    v_sub_id          NUMBER;
     v_generated_ref   VARCHAR2(30);
     v_start_date      DATE := SYSDATE;
 BEGIN
@@ -74,24 +75,31 @@ BEGIN
             membership_id,
             member_id,
             from_date,
-            thru_date,
-            payment_id
+            thru_date
         ) VALUES (
             p_membership_id,
             p_member_id,
             ADD_MONTHS(v_start_date, i - 1),
-            ADD_MONTHS(v_start_date, i),
+            ADD_MONTHS(v_start_date, i)
+        )
+        RETURNING id INTO v_sub_id;
+
+        INSERT INTO subscription_payment (
+            monthly_subscription_id,
+            payment_id
+        ) VALUES (
+            v_sub_id,
             v_payment_id
         );
 
-        DBMS_OUTPUT.PUT_LINE('Processed Month ' || i || ': Ref ' || v_generated_ref);
+        DBMS_OUTPUT.PUT_LINE('Processed Month ' || i || ': Sub_ID ' || v_sub_id || ', Pay_ID ' || v_payment_id);
     END LOOP;
 
     COMMIT;
 
     DBMS_OUTPUT.PUT_LINE('-----------------------------------');
-    DBMS_OUTPUT.PUT_LINE('Successfully split into ' || v_months_to_add || ' records.');
-    DBMS_OUTPUT.PUT_LINE('Member ID: ' || p_member_id);
+    DBMS_OUTPUT.PUT_LINE('Successfully linked via subscription_payment');
+    DBMS_OUTPUT.PUT_LINE('Total months processed: ' || v_months_to_add);
     DBMS_OUTPUT.PUT_LINE('-----------------------------------');
 
 EXCEPTION
@@ -100,7 +108,7 @@ EXCEPTION
         RAISE;
 END;
 
---EXEC proc_subscribe_member(4,2, 50.00, 1);
+--EXEC proc_subscribe_member(4,2, 98.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
 CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
@@ -228,15 +236,14 @@ END;
 
 -- SQL> SET LINESIZE 150;
 -- SQL> SET PAGESIZE 400;
+--SET SERVEROUTPUT ON
 --REPORT -1 ： proc_new_member_conversion_analysis
 CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year IN NUMBER) IS
     v_year              NUMBER := p_report_year;
     v_m_conversion      NUMBER;
-
     v_grand_new_join    NUMBER := 0;
     v_grand_new_sub     NUMBER := 0;
     v_grand_total_rev   NUMBER := 0;
-
     v_line_width        CONSTANT NUMBER := 95;
     v_month_id          NUMBER;
 
