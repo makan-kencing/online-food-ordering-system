@@ -113,10 +113,10 @@ class Membership(Base, HasId, HasNameAndDescription):
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="membership")
 
 
-class MenuCategory(Base, HasId, HasNameAndDescription):
-    __tablename__ = "menu_category"
+class MenuGroup(Base, HasId, HasNameAndDescription):
+    __tablename__ = "menu_group"
 
-    featured_on: Mapped[set[Menu]] = relationship(back_populates="category")
+    featured_on: Mapped[set[MenuItem]] = relationship(back_populates="group")
 
 
 class OrderValue(Base, HasId):
@@ -142,10 +142,9 @@ class Product(Base, HasId, HasNameAndDescription):
     image_url: Mapped[str | None] = mapped_column(URL_STRING)
 
     categories: Mapped[set[ProductCategoryClassification]] = relationship(back_populates="product")
-    featured_on: Mapped[set[Menu]] = relationship(back_populates="product")
+    featured_on: Mapped[set[MenuItem]] = relationship(back_populates="product")
     ordered: Mapped[set[OrderItem]] = relationship(back_populates="product")
-    product_features: Mapped[set[ProductFeatureApplicability]] = relationship(back_populates="product")
-    product_feature_interactions: Mapped[set[ProductFeatureInteraction]] = relationship(back_populates="product")
+    attributes: Mapped[set[ProductAttribute]] = relationship(back_populates="product")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product")
 
 
@@ -159,12 +158,6 @@ class ProductCategory(Base, HasNameAndDescription):
     parent: Mapped[ProductCategory | None] = relationship(back_populates="children")
     children: Mapped[set[ProductCategory]] = relationship(back_populates="parent", remote_side=[id])
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_category")
-
-
-class ProductFeatureCategory(Base, HasId, HasNameAndDescription):
-    __tablename__ = "product_feature_category"
-
-    product_features: Mapped[set[ProductFeature]] = relationship(back_populates="category")
 
 
 class QuantityBreak(Base, HasId):
@@ -252,15 +245,26 @@ class ProductCategoryClassification(Base):
     )
 
 
-class ProductFeature(Base, HasId, HasNameAndDescription):
+class ProductFeature(Base, HasId):
     __tablename__ = "product_feature"
 
-    category_id: Mapped[int] = mapped_column(ForeignKey("product_feature_category.id"))
+    name: Mapped[str] = mapped_column(SHORT_STRING)
+    code: Mapped[str] = mapped_column(VERY_SHORT_STRING)
 
-    category: Mapped[ProductFeatureCategory] = relationship(back_populates="product_features")
-    products: Mapped[set[ProductFeatureApplicability]] = relationship(back_populates="product_feature")
+    fields: Mapped[set[ProductFeatureGroupField]] = relationship(back_populates="product_feature")
     order_item_features: Mapped[set[OrderItemFeature]] = relationship(back_populates="product_feature")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_feature")
+
+
+class ProductFeatureGroup(Base, HasId):
+    __tablename__ = "product_feature_group"
+
+    name: Mapped[str] = mapped_column(SHORT_STRING)
+    min: Mapped[int]
+    max: Mapped[int | None]
+
+    fields: Mapped[set[ProductFeatureGroupField]] = relationship(back_populates="product_feature_group")
+    attributes: Mapped[set[ProductAttribute]] = relationship(back_populates="product_feature_group")
 
 
 class Restaurant(Base, HasId, HasNameAndDescription):
@@ -275,7 +279,7 @@ class Restaurant(Base, HasId, HasNameAndDescription):
     address_id: Mapped[int] = mapped_column(ForeignKey("address.id"), unique=True)
 
     address: Mapped[Address] = relationship(back_populates="restaurant", single_parent=True)
-    menu: Mapped[set[Menu]] = relationship(back_populates="restaurant")
+    menu_item: Mapped[set[MenuItem]] = relationship(back_populates="restaurant")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="restaurant")
 
 
@@ -321,19 +325,19 @@ class Invoice(Base, HasId):
     vouchers: Mapped[set[VoucherRedemption]] = relationship(back_populates="invoice")
 
 
-class Menu(Base):
-    __tablename__ = "menu"
+class MenuItem(Base):
+    __tablename__ = "menu_item"
 
     product_id: Mapped[int] = mapped_column(ForeignKey("product.id"))
     restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurant.id"))
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("menu_category.id"))
+    group_id: Mapped[int | None] = mapped_column(ForeignKey("menu_group.id"))
     is_unavailable: Mapped[bool] = mapped_column(server_default=expression.false())
     from_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     thru_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
 
     product: Mapped[Product] = relationship(back_populates="featured_on")
-    restaurant: Mapped[Restaurant] = relationship(back_populates="menu")
-    category: Mapped[MenuCategory | None] = relationship(back_populates="featured_on")
+    restaurant: Mapped[Restaurant] = relationship(back_populates="menu_item")
+    group: Mapped[MenuGroup | None] = relationship(back_populates="featured_on")
 
     __table_args__ = (
         PrimaryKeyConstraint("product_id", "restaurant_id"),
@@ -405,47 +409,31 @@ class PriceComponent(Base, HasId):
     vendor: Mapped[DeliveryVendor | None] = relationship(back_populates="priced")
 
 
-class ProductFeatureApplicability(Base):
-    class ApplicabilityType(Enum):
-        REQUIRED = auto()
-        STANDARD = auto()
-        OPTIONAL = auto()
-        SELECTABLE = auto()
-
-    __tablename__ = "product_feature_applicability"
+class ProductAttribute(Base):
+    __tablename__ = "product_attribute"
 
     product_id: Mapped[int] = mapped_column(ForeignKey("product.id"))
-    product_feature_id: Mapped[int] = mapped_column(ForeignKey("product_feature.id"))
-    feature_type: Mapped[ApplicabilityType] = mapped_column(SAEnum(ApplicabilityType))
-    from_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
-    thru_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    product_feature_group_id: Mapped[int] = mapped_column(ForeignKey("product_feature_group.id"))
 
-    product: Mapped[Product] = relationship(back_populates="product_features")
-    product_feature: Mapped[ProductFeature] = relationship(back_populates="products")
+    product: Mapped[Product] = relationship(back_populates="attributes")
+    product_feature_group: Mapped[ProductFeatureGroup] = relationship(back_populates="attributes")
 
     __table_args__ = (
-        PrimaryKeyConstraint("product_id", "product_feature_id"),
+        PrimaryKeyConstraint("product_id", "product_feature_group_id"),
     )
 
 
-class ProductFeatureInteraction(Base, HasId):
-    class InteractionType(Enum):
-        DEPENDENT = auto()
-        INCOMPATIBLE = auto()
+class ProductFeatureGroupField(Base):
+    __tablename__ = "product_feature_group_field"
 
-    __tablename__ = "product_feature_interaction"
+    product_feature_id: Mapped[int] = mapped_column(ForeignKey("product_feature.id"))
+    product_feature_group_id: Mapped[int] = mapped_column(ForeignKey("product_feature_group.id"))
 
-    feature_a_id: Mapped[int] = mapped_column(ForeignKey("product_feature.id"))
-    feature_b_id: Mapped[int] = mapped_column(ForeignKey("product_feature.id"))
-    product_id: Mapped[int | None] = mapped_column(ForeignKey("product.id"))
-    interaction_type: Mapped[InteractionType] = mapped_column(SAEnum(InteractionType))
-
-    feature_a: Mapped[ProductFeature] = relationship(foreign_keys=[feature_a_id])
-    feature_b: Mapped[ProductFeature] = relationship(foreign_keys=[feature_b_id])
-    product: Mapped[Product | None] = relationship(back_populates="product_feature_interactions")
+    product_feature: Mapped[ProductFeature] = relationship(back_populates="fields")
+    product_feature_group: Mapped[ProductFeatureGroup] = relationship(back_populates="fields")
 
     __table_args__ = (
-        UniqueConstraint("feature_a_id", "feature_b_id", "product_id"),
+        PrimaryKeyConstraint("product_feature_id", "product_feature_group_id"),
     )
 
 
