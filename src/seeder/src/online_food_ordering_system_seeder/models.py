@@ -225,7 +225,7 @@ class Payment(Base, HasId):
 
     payment_method: Mapped[PaymentMethod] = relationship(back_populates="payments")
     invoice: Mapped[Invoice | None] = relationship(back_populates="payment")
-    subscriptions: Mapped[set[MonthlySubscription]] = relationship(back_populates="payment")
+    subscriptions: Mapped[set[SubscriptionPayment]] = relationship(back_populates="payment")
 
 
 class ProductCategoryClassification(Base):
@@ -349,13 +349,12 @@ class MonthlySubscription(Base, HasId):
 
     membership_id: Mapped[int] = mapped_column(ForeignKey("membership.id"))
     member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
-    payment_id: Mapped[int] = mapped_column(ForeignKey("payment.id"))
     from_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     thru_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
 
     membership: Mapped[Membership] = relationship(back_populates="subscribers")
     member: Mapped[Member] = relationship(back_populates="subscriptions")
-    payment: Mapped[Payment] = relationship(back_populates="subscriptions")
+    payments: Mapped[set[SubscriptionPayment]] = relationship(back_populates="monthly_subscription")
 
 
 class OrderItem(Base, HasId):
@@ -482,6 +481,20 @@ class OrderItemFeature(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("product_feature_id", "order_item_id"),
+    )
+
+
+class SubscriptionPayment(Base):
+    __tablename__ = "subscription_payment"
+
+    monthly_subscription_id: Mapped[int] = mapped_column(ForeignKey("monthly_subscription.id"))
+    payment_id: Mapped[int] = mapped_column(ForeignKey("payment.id"))
+
+    monthly_subscription: Mapped[MonthlySubscription] = relationship(back_populates="payments")
+    payment: Mapped[Payment] = relationship(back_populates="subscriptions")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("monthly_subscription_id", "payment_id"),
     )
 
 
