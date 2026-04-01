@@ -28,7 +28,7 @@ WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
 --PROCEDURE -1 : proc_subscribe_member
 CREATE OR REPLACE PROCEDURE proc_subscribe_member (
     p_member_id      IN member.id%TYPE,
-    p_membership_id in membership.id%TYPE,
+    p_membership_id  IN membership.id%TYPE,
     p_amount         IN NUMBER,
     p_pay_method_id  IN NUMBER
 ) AS
@@ -36,55 +36,63 @@ CREATE OR REPLACE PROCEDURE proc_subscribe_member (
     v_months_to_add   NUMBER;
     v_payment_id      NUMBER;
     v_generated_ref   VARCHAR2(30);
+    v_start_date      DATE := SYSDATE;
 BEGIN
-   BEGIN
+    BEGIN
         SELECT price INTO v_unit_price
         FROM membership
         WHERE id = p_membership_id;
+
         IF p_amount <= 0 OR MOD(p_amount, v_unit_price) != 0 THEN
-             RAISE_APPLICATION_ERROR(-20001, 'Invalid amount. Must be a' || v_unit_price ||'or multiple of '|| v_unit_price );
+             RAISE_APPLICATION_ERROR(-20001, 'Invalid amount. Must be ' || v_unit_price || ' or multiple of ' || v_unit_price);
         END IF;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
             RAISE_APPLICATION_ERROR(-20002, 'Membership ID not found.');
     END;
 
-    INSERT INTO payment (
-        amount,
-        paid_at,
-        payment_method_id,
-        REF_NO,
-        PAYMENT_METHOD_DATA
-    ) VALUES (
-        p_amount,
-        CURRENT_TIMESTAMP,
-        p_pay_method_id,
-        'TEMP',
-        '{"status": "AUTO_PROCESSED", "source": "PROCEDURE"}'
-    )
-    RETURNING id, ref_no INTO v_payment_id, v_generated_ref;
     v_months_to_add := p_amount / v_unit_price;
 
-    INSERT INTO monthly_subscription (
-        membership_id,
-        member_id,
-        from_date,
-        thru_date,
-        payment_id
-    ) VALUES (
-         p_membership_id,
-        p_member_id,
-        CURRENT_TIMESTAMP,
-        ADD_MONTHS(CURRENT_TIMESTAMP, v_months_to_add),
-        v_payment_id
-    );
+    FOR i IN 1..v_months_to_add LOOP
+
+        INSERT INTO payment (
+            amount,
+            paid_at,
+            payment_method_id,
+            REF_NO,
+            PAYMENT_METHOD_DATA
+        ) VALUES (
+            v_unit_price,
+            CURRENT_TIMESTAMP,
+            p_pay_method_id,
+            'TEMP',
+            '{"status": "AUTO_SPLIT", "month_index": ' || i || '}'
+        )
+        RETURNING id, ref_no INTO v_payment_id, v_generated_ref;
+
+        INSERT INTO monthly_subscription (
+            membership_id,
+            member_id,
+            from_date,
+            thru_date,
+            payment_id
+        ) VALUES (
+            p_membership_id,
+            p_member_id,
+            ADD_MONTHS(v_start_date, i - 1),
+            ADD_MONTHS(v_start_date, i),
+            v_payment_id
+        );
+
+        DBMS_OUTPUT.PUT_LINE('Processed Month ' || i || ': Ref ' || v_generated_ref);
+    END LOOP;
 
     COMMIT;
 
-    DBMS_OUTPUT.PUT_LINE('--- Subscription Success ---');
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
+    DBMS_OUTPUT.PUT_LINE('Successfully split into ' || v_months_to_add || ' records.');
     DBMS_OUTPUT.PUT_LINE('Member ID: ' || p_member_id);
-    DBMS_OUTPUT.PUT_LINE('Reference No: ' || v_generated_ref);
-    DBMS_OUTPUT.PUT_LINE('Months Added: ' || v_months_to_add);
+    DBMS_OUTPUT.PUT_LINE('-----------------------------------');
 
 EXCEPTION
     WHEN OTHERS THEN
@@ -92,7 +100,7 @@ EXCEPTION
         RAISE;
 END;
 
---EXEC proc_subscribe_member(9,1, 50.00, 1);
+--EXEC proc_subscribe_member(4,2, 50.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
 CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
@@ -320,6 +328,7 @@ EXCEPTION
         DBMS_OUTPUT.PUT_LINE('ERROR GENERATING REPORT: ' || SQLERRM);
 END;
 
+--exec proc_new_member_conversion_analysis(2026)
 
 --REPORT -2 ：monthly_payment_method_using_summary_report
  CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (v_report_date IN DATE) IS
