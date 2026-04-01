@@ -239,6 +239,7 @@ END;
 --SET SERVEROUTPUT ON
 --REPORT -1 ： proc_new_member_conversion_analysis
  CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year IN NUMBER) IS
+    v_curr_year         NUMBER := EXTRACT(YEAR FROM SYSDATE);
     v_year              NUMBER := p_report_year;
     v_m_conversion      NUMBER;
     v_grand_new_join    NUMBER := 0;
@@ -282,6 +283,10 @@ END;
     rec_stats cur_monthly_stats%ROWTYPE;
 
 BEGIN
+    IF v_year > v_curr_year THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Error: The year ' || v_year || ' is in the future. Reports can only be generated for current or past years.');
+    END IF;
+
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
     DBMS_OUTPUT.PUT_LINE('|' || LPAD('ANNUAL NEW MEMBER CONVERSION REPORT: ' || v_year, 62) || LPAD('|', 32));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
@@ -343,10 +348,15 @@ END;
 --exec proc_new_member_conversion_analysis(2026)
 
 --REPORT -2 ：monthly_payment_method_using_summary_report
- CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (v_report_date IN DATE) IS
+ CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (
+        p_year  IN NUMBER,
+        p_month IN NUMBER) IS
 
-    v_target_year     NUMBER := EXTRACT(YEAR FROM v_report_date);
-    v_target_month    NUMBER := EXTRACT(MONTH FROM v_report_date);
+    v_curr_year       NUMBER := EXTRACT(YEAR FROM SYSDATE);
+    v_curr_month      NUMBER := EXTRACT(MONTH FROM SYSDATE);
+
+    v_target_year     NUMBER :=  p_year;
+    v_target_month    NUMBER := p_month;
     v_pay_method_id   PAYMENT_METHOD.ID%TYPE;
     v_pay_method_name PAYMENT_METHOD.NAME%TYPE;
 
@@ -374,6 +384,19 @@ END;
     payRec payDetailCursor%ROWTYPE;
 
 BEGIN
+
+    IF v_target_year > v_curr_year THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Error: The year ' || v_target_year || ' is in the future. Please enter a valid year.');
+    END IF;
+
+
+    IF v_target_month < 1 OR v_target_month > 12 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Error: Month must be between 1 and 12.');
+    END IF;
+
+    IF v_target_year = v_curr_year AND v_target_month > v_curr_month THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Error: Data for ' || v_target_year || '-' || v_target_month || ' does not exist yet.');
+    END IF;
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
     DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 12) || 'MONTHLY PAYMENT METHOD SUMMARY: ' || v_target_year || '-' || LPAD(v_target_month, 2, '0') || LPAD(' ', 12) || '|');
     DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
@@ -440,3 +463,4 @@ BEGIN
     CLOSE payMetTypeCursor;
 END;
 
+--EXEC monthly_payment_method_summary_report(2029, 1);
