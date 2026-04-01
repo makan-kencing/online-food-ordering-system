@@ -48,7 +48,7 @@ exception
     when voucher_redeem_out_of_time then
         raise_application_error(-20300, 'Voucher cannot be redeemed out of the available time range');
 end;
-
+/
 
 create trigger t_check_voucher_can_change_usage_limit
     before
