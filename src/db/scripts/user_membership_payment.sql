@@ -108,7 +108,7 @@ EXCEPTION
         RAISE;
 END;
 
---EXEC proc_subscribe_member(4,2, 98.00, 1);
+--EXEC proc_subscribe_member(28,2, 98.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
 CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
@@ -238,7 +238,7 @@ END;
 -- SQL> SET PAGESIZE 400;
 --SET SERVEROUTPUT ON
 --REPORT -1 ： proc_new_member_conversion_analysis
-CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year IN NUMBER) IS
+ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year IN NUMBER) IS
     v_year              NUMBER := p_report_year;
     v_m_conversion      NUMBER;
     v_grand_new_join    NUMBER := 0;
@@ -250,35 +250,47 @@ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year I
     CURSOR cur_months IS
         SELECT LEVEL as month_num FROM DUAL CONNECT BY LEVEL <= 12;
 
-    CURSOR cur_monthly_stats (p_y NUMBER, p_m NUMBER) IS
+   CURSOR cur_monthly_stats (p_y NUMBER, p_m NUMBER) IS
         SELECT
+
             (SELECT COUNT(*) FROM member
              WHERE EXTRACT(YEAR FROM created_at) = p_y
-               AND EXTRACT(MONTH FROM created_at) = p_m) as new_join,-- this is for get the new monthly join member
+               AND EXTRACT(MONTH FROM created_at) = p_m) as new_join,
+
             (SELECT COUNT(DISTINCT s.member_id)
              FROM monthly_subscription s
              JOIN member m ON s.member_id = m.id
              WHERE EXTRACT(YEAR FROM s.from_date) = p_y
                AND EXTRACT(MONTH FROM s.from_date) = p_m
                AND EXTRACT(YEAR FROM m.created_at) = p_y
-               AND EXTRACT(MONTH FROM m.created_at) = p_m) as new_subs, -- and the new member have subscript the membership or not
-            (SELECT NVL(SUM(amount), 0) FROM payment
-             WHERE EXTRACT(YEAR FROM paid_at) = p_y
-               AND EXTRACT(MONTH FROM paid_at) = p_m) as subtotal
+               AND EXTRACT(MONTH FROM m.created_at) = p_m) as new_subs,
+
+            (SELECT NVL(SUM(daily_first_val), 0)
+             FROM (
+                 SELECT MAX(p.amount) as daily_first_val
+                 FROM payment p
+                 JOIN subscription_payment sp ON p.id = sp.payment_id
+                 JOIN monthly_subscription s  ON sp.monthly_subscription_id = s.id
+                 JOIN member m               ON s.member_id = m.id
+                 WHERE EXTRACT(YEAR FROM s.from_date) = p_y
+                   AND EXTRACT(MONTH FROM s.from_date) = p_m
+                   AND EXTRACT(YEAR FROM m.created_at) = p_y
+                 GROUP BY m.id, TRUNC(s.from_date)
+             )) as subtotal
         FROM DUAL;
 
     rec_stats cur_monthly_stats%ROWTYPE;
 
 BEGIN
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 20) || 'ANNUAL NEW MEMBER CONVERSION REPORT: ' || v_year || LPAD(' ', 32) || '|');
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE('|' || LPAD('ANNUAL NEW MEMBER CONVERSION REPORT: ' || v_year, 62) || LPAD('|', 32));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 
     DBMS_OUTPUT.PUT_LINE(
-        RPAD('MONTH', 12) ||
+        RPAD('MONTH', 15) ||
         RPAD('NEW JOIN (FREE)', 20) ||
         RPAD('NEW SUBS (PAID)', 20) ||
-        RPAD('MONTHLY REV', 20) ||
+        RPAD('NEW MEMBER REV', 20) ||
         'CONVERSION '
     );
     DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
@@ -299,11 +311,11 @@ BEGIN
         END IF;
 
         DBMS_OUTPUT.PUT_LINE(
-            RPAD(TO_CHAR(TO_DATE(v_month_id, 'MM'), 'Month'), 12) ||
+            RPAD(TO_CHAR(TO_DATE(v_month_id, 'MM'), 'Month'), 15) ||
             RPAD(rec_stats.new_join, 20) ||
             RPAD(rec_stats.new_subs, 20) ||
-            RPAD('RM ' || TO_CHAR(rec_stats.subtotal, '99,990.00'), 20) ||
-            TO_CHAR(v_m_conversion, '990.99') || '%'
+            RPAD('RM ' || LPAD(TO_CHAR(rec_stats.subtotal, '9,990.00'), 10), 20) ||
+            LPAD(TO_CHAR(v_m_conversion, '990.99'), 8) || '%'
         );
 
         v_grand_new_join  := v_grand_new_join + rec_stats.new_join;
@@ -312,28 +324,21 @@ BEGIN
     END LOOP;
     CLOSE cur_months;
 
-    --This is for Grand Summary
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
     DBMS_OUTPUT.PUT_LINE('YEARLY GRAND SUMMARY (' || v_year || '):');
     DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-    DBMS_OUTPUT.PUT_LINE(RPAD('1. Total New Members (Free Join)', 50) || ': ' || LPAD(v_grand_new_join, 20));
-    DBMS_OUTPUT.PUT_LINE(RPAD('2. Total New Subscriptions (Paid)', 50) || ': ' || LPAD(v_grand_new_sub, 20));
-    DBMS_OUTPUT.PUT_LINE(RPAD('3. Grand Total Revenue', 50) || ': ' || LPAD('RM ' || TO_CHAR(v_grand_total_rev, '999,990.00'), 20));
+    DBMS_OUTPUT.PUT_LINE(RPAD('1. Total New Members (Free Join)', 55) || ': ' || LPAD(v_grand_new_join, 20));
+    DBMS_OUTPUT.PUT_LINE(RPAD('2. Total New Subscriptions (Paid)', 55) || ': ' || LPAD(v_grand_new_sub, 20));
+    DBMS_OUTPUT.PUT_LINE(RPAD('3. Grand Total Revenue from New Mems', 55) || ': ' || LPAD('RM ' || TO_CHAR(v_grand_total_rev, '999,990.00'), 20));
 
     IF v_grand_new_join > 0 THEN
-        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate ', 50) || ': ' ||
-            LPAD(TO_CHAR((v_grand_new_sub / v_grand_new_join) * 100, '990.99') || '%', 20));
+        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate', 55) || ': ' || LPAD(TO_CHAR((v_grand_new_sub / v_grand_new_join) * 100, '990.99') || '%', 20));
     ELSE
-        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate ', 50) || ': ' || LPAD('0.00%', 20));
+        DBMS_OUTPUT.PUT_LINE(RPAD('4. Overall Conversion Rate', 55) || ': ' || LPAD('0.00%', 20));
     END IF;
-
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD(' ', 65) || '*** END OF REPORT ***');
-
-EXCEPTION
-    WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('ERROR GENERATING REPORT: ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 END;
+/
 
 --exec proc_new_member_conversion_analysis(2026)
 
