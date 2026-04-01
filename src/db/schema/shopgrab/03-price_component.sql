@@ -24,11 +24,14 @@ CREATE TABLE price_component
     membership_id       INT REFERENCES membership (id),
     voucher_id          INT REFERENCES voucher (id),
     vendor_id           INT REFERENCES delivery_vendor (id),
+    created_by_id       INT REFERENCES member (id)          NOT NULL,
     CHECK ( amount IS NULL != percentage IS NULL ),                       -- mutual exclusion
     CHECK ( thru_date is null or thru_date > from_date ),
     CHECK ( coalesce(product_id, product_feature_id, product_category_id, -- at least one condition
                      quantity_break_id, order_value_id, restaurant_id,
-                     membership_id, voucher_id, vendor_id) IS NOT NULL )
+                     membership_id, voucher_id, vendor_id) IS NOT NULL ),
+    UNIQUE (product_id, product_feature_id, product_category_id, quantity_break_id, order_value_id, restaurant_id,
+            membership_id, voucher_id, vendor_id)
 );
 
 create sequence seq_daily_price_index
@@ -64,3 +67,11 @@ begin
     );
 end;
 /
+
+-- create view product_pricing as
+--     select *
+--     from product p
+--         join product_feature_applicability pfa on pfa.product_id = p.id
+--         join product_feature pf on pfa.product_feature_id = pf.id
+
+

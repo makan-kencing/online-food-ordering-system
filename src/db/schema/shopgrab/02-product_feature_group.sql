@@ -1,8 +1,8 @@
-CREATE TABLE product_category
+CREATE TABLE product_feature_group
 (
     id            INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name          VARCHAR(50)                NOT NULL,
-    description   VARCHAR(200)               NOT NULL,
-    parent        INT REFERENCES product_category (id),
+    min           INT DEFAULT 0              NOT NULL,
+    max           INT,
     created_by_id INT REFERENCES member (id) NOT NULL
-)
+);

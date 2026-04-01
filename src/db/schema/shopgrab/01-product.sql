@@ -5,5 +5,6 @@ CREATE TABLE product
     name              VARCHAR(50)                         NOT NULL,
     description       VARCHAR(200)                        NOT NULL,
     introduction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    image_url         VARCHAR(2083)
+    image_url         VARCHAR(2083),
+    created_by_id     INT REFERENCES member (id)          NOT NULL
 );

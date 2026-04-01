@@ -1,10 +1,11 @@
 CREATE TABLE voucher
 (
-    id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name        VARCHAR(50)                         NOT NULL,
-    description VARCHAR(200)                        NOT NULl,
-    usage_limit INT CHECK ( usage_limit > 0 ),
-    from_date   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    thru_date   TIMESTAMP,
+    id            INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name          VARCHAR(50)                         NOT NULL,
+    description   VARCHAR(200)                        NOT NULl,
+    usage_limit   INT CHECK ( usage_limit > 0 ),
+    from_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    thru_date     TIMESTAMP,
+    created_by_id INT REFERENCES member (id)          NOT NULL,
     CHECK ( thru_date is null or thru_date > from_date )
 );
