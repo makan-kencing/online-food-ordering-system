@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum, auto
-from typing import Any, Protocol
+from typing import Any
 
 from sqlalchemy import String, Numeric, DateTime, ForeignKey, Interval, Enum as SAEnum, JSON, PrimaryKeyConstraint, \
     UniqueConstraint
@@ -144,6 +144,15 @@ class Product(Base, HasId, HasNameAndDescription):
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product")
     created_by: Mapped[Member] = relationship(back_populates="created_products")
 
+    @property
+    def base_price(self) -> PriceComponent | None:
+        for price in sorted(self.priced, key=lambda p: p.from_date, reverse=True):
+            if price.product_id and not any(
+                    (price.product_feature_id, price.product_category_id, price.quantity_break_id, price.order_value_id,
+                     price.restaurant_id, price.membership_id, price.voucher_id, price.vendor_id)):
+                return price
+        return None
+
 
 class ProductCategory(Base, HasNameAndDescription):
     __tablename__ = "product_category"
@@ -157,7 +166,6 @@ class ProductCategory(Base, HasNameAndDescription):
     children: Mapped[set[ProductCategory]] = relationship(back_populates="parent", remote_side=[id])
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_category")
     created_by: Mapped[Member] = relationship(back_populates="created_product_categories")
-
 
 
 class QuantityBreak(Base, HasId):
@@ -271,6 +279,16 @@ class ProductFeature(Base, HasId):
     order_item_features: Mapped[set[OrderItemFeature]] = relationship(back_populates="product_feature")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_feature")
     created_by: Mapped[Member] = relationship(back_populates="created_product_features")
+
+    @property
+    def base_price(self) -> PriceComponent | None:
+        for price in sorted(self.priced, key=lambda p: p.from_date, reverse=True):
+            if price.product_feature_id and not any(
+                    (price.product_id, price.product_category_id, price.quantity_break_id, price.order_value_id,
+                     price.restaurant_id, price.membership_id, price.voucher_id, price.vendor_id)):
+                return price
+        return None
+
 
 
 class ProductFeatureGroup(Base, HasId):

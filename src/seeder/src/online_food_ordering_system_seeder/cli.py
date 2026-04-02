@@ -4,6 +4,7 @@ import click
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from online_food_ordering_system_seeder import common
+from online_food_ordering_system_seeder.commands import Seeder
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,11 @@ def seed(host: str, port: int, sid: str, username: str, password: str) -> None:
         }
     )
     common.Session.configure(bind=engine)
+
+    with Seeder(common.Session()) as seeder:
+        seeder.seed_memberships()
+        seeder.seed_vouchers()
+        seeder.seed_orders()
 
 
 if __name__ == "__main__":
