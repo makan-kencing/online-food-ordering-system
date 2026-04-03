@@ -21,13 +21,17 @@ class Seeder:
         self.session.__enter__()
         self.tables: dict[type[T], Sequence[T]] = {
             models.Member: self.session.scalars(select(models.Member)
-                                                .join(models.Member.addresses)).all(),
+                                                .options(contains_eager(models.Member.addresses),
+                                                         contains_eager(models.Member.subscriptions))
+                                                .join(models.Member.addresses)
+                                                .join(models.Member.subscriptions)).unique().all(),
             models.PaymentMethod: self.session.scalars(select(models.PaymentMethod)).all(),
             models.Membership: self.session.scalars(select(models.Membership)).all(),
             models.Restaurant: self.session.scalars(select(models.Restaurant)).all(),
             models.DeliveryVendor: self.session.scalars(select(models.DeliveryVendor)).all(),
             models.Voucher: self.session.scalars(select(models.Voucher)).all()
         }
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.session.commit()
@@ -58,7 +62,8 @@ class Seeder:
         product_priced_alias = aliased(models.PriceComponent)
         product_feature_priced_alias = aliased(models.PriceComponent)
         stmt = select(models.MenuItem) \
-            .options(contains_eager(models.MenuItem.product).contains_eager(models.Product.priced, product_priced_alias),
+            .options(contains_eager(models.MenuItem.product)
+                     .contains_eager(models.Product.priced, product_priced_alias),
                      contains_eager(models.MenuItem.product)
                      .contains_eager(models.Product.attributes)
                      .contains_eager(models.ProductAttribute.product_feature_group)
