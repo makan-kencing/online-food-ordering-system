@@ -244,7 +244,7 @@ class Payment(Base, HasId):
     paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     ref_no: Mapped[str] = mapped_column(LONG_STRING)
     amount: Mapped[Decimal] = mapped_column(Numeric())
-    payment_method_data: Mapped[str] = mapped_column(JSON())
+    payment_method_data: Mapped[str]
 
     payment_method: Mapped[PaymentMethod] = relationship(back_populates="payments")
     invoice: Mapped[Invoice | None] = relationship(back_populates="payment")
