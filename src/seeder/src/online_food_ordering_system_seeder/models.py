@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum, auto
-from typing import Any, Protocol
+from typing import Any
 
 from sqlalchemy import String, Numeric, DateTime, ForeignKey, Interval, Enum as SAEnum, JSON, PrimaryKeyConstraint, \
     UniqueConstraint
@@ -53,19 +53,6 @@ class HasNameAndDescription:
     description: Mapped[str] = mapped_column(LONG_STRING)
 
 
-class ICanBeCreated(Protocol):
-    created_by_id: Mapped[int]
-    created_by: Mapped[Member]
-
-
-def CanBeCreated(back_populates: str) -> type[ICanBeCreated]:  # noqa
-    class Wrapper(ICanBeCreated):
-        created_by_id: Mapped[int] = mapped_column()
-        created_by: Mapped[Member] = relationship(back_populates=back_populates)
-
-    return Wrapper
-
-
 class Address(Base, HasId):
     __tablename__ = "address"
 
@@ -102,6 +89,14 @@ class Member(Base, HasId):
     orders: Mapped[set[Orders]] = relationship(back_populates="member")
     vouchers: Mapped[set[VoucherDistribution]] = relationship(back_populates="member")
     subscriptions: Mapped[set[MonthlySubscription]] = relationship(back_populates="member")
+
+    created_product_categories: Mapped[set[ProductCategory]] = relationship(back_populates="created_by")
+    created_product_features: Mapped[set[ProductFeature]] = relationship(back_populates="created_by")
+    created_product_feature_groups: Mapped[set[ProductFeatureGroup]] = relationship(back_populates="created_by")
+    created_products: Mapped[set[Product]] = relationship(back_populates="created_by")
+    created_restaurants: Mapped[set[Restaurant]] = relationship(back_populates="created_by")
+    created_price_components: Mapped[set[PriceComponent]] = relationship(back_populates="created_by")
+    created_vouchers: Mapped[set[Voucher]] = relationship(back_populates="created_by")
 
 
 class Membership(Base, HasId, HasNameAndDescription):
@@ -140,12 +135,23 @@ class Product(Base, HasId, HasNameAndDescription):
     code: Mapped[str] = mapped_column(String(10), unique=True)
     introduction_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.utcnow())
     image_url: Mapped[str | None] = mapped_column(URL_STRING)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     categories: Mapped[set[ProductCategoryClassification]] = relationship(back_populates="product")
     featured_on: Mapped[set[MenuItem]] = relationship(back_populates="product")
     ordered: Mapped[set[OrderItem]] = relationship(back_populates="product")
     attributes: Mapped[set[ProductAttribute]] = relationship(back_populates="product")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product")
+    created_by: Mapped[Member] = relationship(back_populates="created_products")
+
+    @property
+    def base_price(self) -> PriceComponent | None:
+        for price in sorted(self.priced, key=lambda p: p.from_date, reverse=True):
+            if price.product_id and not any(
+                    (price.product_feature_id, price.product_category_id, price.quantity_break_id, price.order_value_id,
+                     price.restaurant_id, price.membership_id, price.voucher_id, price.vendor_id)):
+                return price
+        return None
 
 
 class ProductCategory(Base, HasNameAndDescription):
@@ -153,11 +159,13 @@ class ProductCategory(Base, HasNameAndDescription):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("product_category.id"))
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     products: Mapped[set[ProductCategoryClassification]] = relationship(back_populates="product_category")
     parent: Mapped[ProductCategory | None] = relationship(back_populates="children")
     children: Mapped[set[ProductCategory]] = relationship(back_populates="parent", remote_side=[id])
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_category")
+    created_by: Mapped[Member] = relationship(back_populates="created_product_categories")
 
 
 class QuantityBreak(Base, HasId):
@@ -175,9 +183,11 @@ class Voucher(Base, HasId, HasNameAndDescription):
     usage_limit: Mapped[int | None] = mapped_column()
     from_date: Mapped[datetime] = mapped_column()
     thru_date: Mapped[datetime | None] = mapped_column()
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     distributed_to: Mapped[set[VoucherDistribution]] = relationship(back_populates="voucher")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="voucher")
+    created_by: Mapped[Member] = relationship(back_populates="created_vouchers")
 
 
 class MemberAddress(Base):
@@ -212,6 +222,19 @@ class Orders(Base, HasId):
     items: Mapped[set[OrderItem]] = relationship(back_populates="order")
     adjustments: Mapped[set[OrderItemAdjustment]] = relationship(back_populates="order")
 
+    @property
+    def subtotal(self) -> Decimal:
+        total = Decimal(0)
+        for item in self.items:
+            total += item.subtotal
+        for adjustment in self.adjustments:
+            if adjustment.order_item_id:
+                continue
+            m = -1 if adjustment.adjustment_type == OrderItemAdjustment.AdjustmentType.DISCOUNT else 1
+            amount = adjustment.percentage * total if adjustment.percentage else adjustment.amount
+            total += m * amount
+
+        return total
 
 
 class Payment(Base, HasId):
@@ -221,11 +244,11 @@ class Payment(Base, HasId):
     paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     ref_no: Mapped[str] = mapped_column(LONG_STRING)
     amount: Mapped[Decimal] = mapped_column(Numeric())
-    payment_method_data: Mapped[str] = mapped_column(JSON())
+    payment_method_data: Mapped[str]
 
     payment_method: Mapped[PaymentMethod] = relationship(back_populates="payments")
     invoice: Mapped[Invoice | None] = relationship(back_populates="payment")
-    subscriptions: Mapped[set[MonthlySubscription]] = relationship(back_populates="payment")
+    subscriptions: Mapped[set[SubscriptionPayment]] = relationship(back_populates="payment")
 
 
 class ProductCategoryClassification(Base):
@@ -250,10 +273,22 @@ class ProductFeature(Base, HasId):
 
     name: Mapped[str] = mapped_column(SHORT_STRING)
     code: Mapped[str] = mapped_column(VERY_SHORT_STRING)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     fields: Mapped[set[ProductFeatureGroupField]] = relationship(back_populates="product_feature")
     order_item_features: Mapped[set[OrderItemFeature]] = relationship(back_populates="product_feature")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="product_feature")
+    created_by: Mapped[Member] = relationship(back_populates="created_product_features")
+
+    @property
+    def base_price(self) -> PriceComponent | None:
+        for price in sorted(self.priced, key=lambda p: p.from_date, reverse=True):
+            if price.product_feature_id and not any(
+                    (price.product_id, price.product_category_id, price.quantity_break_id, price.order_value_id,
+                     price.restaurant_id, price.membership_id, price.voucher_id, price.vendor_id)):
+                return price
+        return None
+
 
 
 class ProductFeatureGroup(Base, HasId):
@@ -262,9 +297,11 @@ class ProductFeatureGroup(Base, HasId):
     name: Mapped[str] = mapped_column(SHORT_STRING)
     min: Mapped[int]
     max: Mapped[int | None]
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     fields: Mapped[set[ProductFeatureGroupField]] = relationship(back_populates="product_feature_group")
     attributes: Mapped[set[ProductAttribute]] = relationship(back_populates="product_feature_group")
+    created_by: Mapped[Member] = relationship(back_populates="created_product_feature_groups")
 
 
 class Restaurant(Base, HasId, HasNameAndDescription):
@@ -277,10 +314,12 @@ class Restaurant(Base, HasId, HasNameAndDescription):
     closing_hour: Mapped[timedelta] = mapped_column(Interval(day_precision=0, second_precision=0))
     is_temporarily_closed: Mapped[bool] = mapped_column(server_default=expression.false())
     address_id: Mapped[int] = mapped_column(ForeignKey("address.id"), unique=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     address: Mapped[Address] = relationship(back_populates="restaurant", single_parent=True)
     menu_item: Mapped[set[MenuItem]] = relationship(back_populates="restaurant")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="restaurant")
+    created_by: Mapped[Member] = relationship(back_populates="created_restaurants")
 
 
 class VoucherDistribution(Base, HasId):
@@ -349,13 +388,12 @@ class MonthlySubscription(Base, HasId):
 
     membership_id: Mapped[int] = mapped_column(ForeignKey("membership.id"))
     member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
-    payment_id: Mapped[int] = mapped_column(ForeignKey("payment.id"))
     from_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     thru_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
 
     membership: Mapped[Membership] = relationship(back_populates="subscribers")
     member: Mapped[Member] = relationship(back_populates="subscriptions")
-    payment: Mapped[Payment] = relationship(back_populates="subscriptions")
+    payments: Mapped[set[SubscriptionPayment]] = relationship(back_populates="monthly_subscription")
 
 
 class OrderItem(Base, HasId):
@@ -372,6 +410,17 @@ class OrderItem(Base, HasId):
     adjustments: Mapped[set[OrderItemAdjustment]] = relationship(back_populates="order_item")
     features: Mapped[set[OrderItemFeature]] = relationship(back_populates="order_item")
     feedback: Mapped[Feedback | None] = relationship(back_populates="order_item")
+
+    @property
+    def subtotal(self) -> Decimal:
+        total = self.unit_price * self.quantity
+        for feature in self.features:
+            total += feature.subtotal
+        for adjustment in self.adjustments:
+            m = -1 if adjustment.adjustment_type == OrderItemAdjustment.AdjustmentType.DISCOUNT else 1
+            amount = adjustment.percentage * total if adjustment.percentage else adjustment.amount
+            total += m * amount
+        return total
 
 
 class PriceComponent(Base, HasId):
@@ -397,6 +446,7 @@ class PriceComponent(Base, HasId):
     membership_id: Mapped[int | None] = mapped_column(ForeignKey("membership.id"))
     voucher_id: Mapped[int | None] = mapped_column(ForeignKey("voucher.id"))
     vendor_id: Mapped[int | None] = mapped_column(ForeignKey("delivery_vendor.id"))
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
 
     product: Mapped[Product | None] = relationship(back_populates="priced")
     product_feature: Mapped[ProductFeature | None] = relationship(back_populates="priced")
@@ -407,6 +457,7 @@ class PriceComponent(Base, HasId):
     membership: Mapped[Membership | None] = relationship(back_populates="priced")
     voucher: Mapped[Voucher | None] = relationship(back_populates="priced")
     vendor: Mapped[DeliveryVendor | None] = relationship(back_populates="priced")
+    created_by: Mapped[Member] = relationship(back_populates="created_price_components")
 
 
 class ProductAttribute(Base):
@@ -482,6 +533,24 @@ class OrderItemFeature(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("product_feature_id", "order_item_id"),
+    )
+
+    @property
+    def subtotal(self) -> Decimal:
+        return self.unit_price * self.quantity
+
+
+class SubscriptionPayment(Base):
+    __tablename__ = "subscription_payment"
+
+    monthly_subscription_id: Mapped[int] = mapped_column(ForeignKey("monthly_subscription.id"))
+    payment_id: Mapped[int] = mapped_column(ForeignKey("payment.id"))
+
+    monthly_subscription: Mapped[MonthlySubscription] = relationship(back_populates="payments")
+    payment: Mapped[Payment] = relationship(back_populates="subscriptions")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("monthly_subscription_id", "payment_id"),
     )
 
 

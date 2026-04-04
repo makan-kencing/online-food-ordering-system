@@ -1,10 +1,12 @@
-import factory.fuzzy
 from datetime import datetime, timedelta
+
+import re
+import factory.fuzzy
 
 from online_food_ordering_system_seeder import models, common
 
-
 START_DATE = datetime(2026, 1, 1)
+
 
 class Base(factory.alchemy.SQLAlchemyModelFactory):
     class Meta:
@@ -16,14 +18,6 @@ class AddressFactory(Base):
     class Meta:
         model = models.Address
 
-    id = factory.Sequence(lambda n: n)
-
-class ProductFactory(Base):
-    class Meta:
-        model = models.Product
-
-    id = factory.Sequence(lambda n: n)
-
 
 class MemberFactory(Base):
     class Meta:
@@ -33,7 +27,6 @@ class MemberFactory(Base):
     profile = factory.Faker("profile")
     address_s = factory.LazyAttribute(lambda o: o.profile["address"].replace("\n", ", "))
 
-    id = factory.Sequence(lambda n: n)
     username = factory.LazyAttribute(lambda o: o.profile["username"])
     email = factory.LazyAttribute(lambda o: o.profile["mail"])
     created_at = factory.fuzzy.FuzzyNaiveDateTime(start_dt=START_DATE)
@@ -45,7 +38,7 @@ class MemberAddressFactory(Base):
 
     member = factory.SubFactory(MemberFactory)
     address = factory.SubFactory(AddressFactory)
-    
+
 
 class MemberWithAddressFactory(MemberFactory):
     addresses = factory.RelatedFactory(
@@ -54,11 +47,13 @@ class MemberWithAddressFactory(MemberFactory):
         address=factory.SubFactory(
             AddressFactory,
             name=factory.LazyAttribute(lambda o: o.factory_parent.factory_parent.profile["name"]),
-            contact_no=factory.Faker("phone_number"),
+            contact_no=factory.Faker("basic_phone_number"),
             address_1=factory.LazyAttribute(lambda o: o.factory_parent.factory_parent.address_s.split(", ")[0]),
             city=factory.LazyAttribute(lambda o: o.factory_parent.factory_parent.address_s.split(", ")[1]),
-            state=factory.LazyAttribute(lambda o: o.factory_parent.factory_parent.address_s.split(", ")[2].split(" ")[0]),
-            postcode=factory.LazyAttribute(lambda o: o.factory_parent.factory_parent.address_s.split(", ")[2].split(" ")[1]),
+            state=factory.LazyAttribute(lambda o: "".join(
+                re.findall(r"\D+", o.factory_parent.factory_parent.address_s.split(", ")[-1]))),
+            postcode=factory.LazyAttribute(lambda o: "".join(
+                re.findall(r"\d+", o.factory_parent.factory_parent.address_s.split(", ")[-1])) or 10100),
             country=factory.Faker("current_country")
         )
     )
@@ -78,7 +73,6 @@ class RestaurantFactory(Base):
     address_faker = factory.Faker("address")
     address_s = factory.LazyAttribute(lambda o: o.address_faker.replace("\n", ", "))
 
-    id = factory.Sequence(lambda n: n)
     code = factory.Faker("company")
     introduction_date = factory.fuzzy.FuzzyDate(start_date=START_DATE.date())
     opening_hour = factory.LazyAttribute(lambda o: o.opening_closing[0])
@@ -87,11 +81,12 @@ class RestaurantFactory(Base):
     address = factory.SubFactory(
         AddressFactory,
         name=factory.LazyAttribute(lambda o: o.factory_parent.code),
-        contact_no=factory.Faker("phone_number"),
+        contact_no=factory.Faker("basic_phone_number"),
         address_1=factory.LazyAttribute(lambda o: o.factory_parent.address_s.split(", ")[0]),
         city=factory.LazyAttribute(lambda o: o.factory_parent.address_s.split(", ")[1]),
-        state=factory.LazyAttribute(lambda o: o.factory_parent.address_s.split(", ")[2].split(" ")[0]),
-        postcode=factory.LazyAttribute(lambda o: o.factory_parent.address_s.split(", ")[2].split(" ")[1]),
+        state=factory.LazyAttribute(lambda o: "".join(
+            re.findall(r"\D+", o.factory_parent.address_s.split(", ")[-1]))),
+        postcode=factory.LazyAttribute(lambda o: "".join(
+            re.findall(r"\d+", o.factory_parent.address_s.split(", ")[-1])) or 10100),
         country=factory.Faker("current_country")
     )
-
