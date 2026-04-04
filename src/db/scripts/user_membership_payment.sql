@@ -1,17 +1,22 @@
 -- Queries -1
 -- Check the membership for the register member is active or expired
-CREATE VIEW membership_status_list AS
+CREATE  VIEW membership_status_list AS
 SELECT
     m.id AS Member_ID,
     m.username,
     MAX(sub.thru_date) AS Latest_Expiry,
     CASE
-        WHEN MAX(sub.thru_date) < CURRENT_DATE THEN 'Expired'
+        WHEN MAX(sub.thru_date) < SYSDATE THEN 'Expired'
         ELSE 'Active'
     END AS Subscription_Status
 FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 GROUP BY m.id, m.username;
+
+SELECT Member_ID, username, Latest_Expiry, Subscription_Status
+FROM membership_status_list
+ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
+
 
 -- Queries -2
 -- check the nearby expired membership subscription of each member
@@ -24,6 +29,23 @@ SELECT
 FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
+
+SELECT
+    username,
+    email,
+    TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
+FROM VW_UPCOMING_EXPIRATIONS
+UNION ALL
+SELECT
+    'No upcoming expirations' AS username,
+    'N/A' AS email,
+    'N/A' AS expiry_date
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM VW_UPCOMING_EXPIRATIONS);
+
+SELECT username, email, TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
+FROM VW_UPCOMING_EXPIRATIONS
+ORDER BY thru_date ASC;
 
 --PROCEDURE -1 : proc_subscribe_member
 CREATE OR REPLACE PROCEDURE proc_subscribe_member (
