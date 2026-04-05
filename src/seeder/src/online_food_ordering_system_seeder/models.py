@@ -206,12 +206,14 @@ class Orders(Base, HasId):
     member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
     ordered_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     order_type: Mapped[OrderType] = mapped_column(SAEnum(OrderType))
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurant.id"))
 
     member: Mapped[Member] = relationship(back_populates="orders")
     delivery: Mapped[Delivery | None] = relationship(back_populates="order")
     invoice: Mapped[Invoice | None] = relationship(back_populates="order")
     items: Mapped[set[OrderItem]] = relationship(back_populates="order")
     adjustments: Mapped[set[OrderItemAdjustment]] = relationship(back_populates="order")
+    restaurant: Mapped[Restaurant] = relationship(back_populates="orders")
 
     @property
     def subtotal(self) -> Decimal:
@@ -300,6 +302,7 @@ class Restaurant(Base, HasId, HasNameAndDescription):
     address: Mapped[Address] = relationship(back_populates="restaurant", single_parent=True)
     menu_item: Mapped[set[MenuItem]] = relationship(back_populates="restaurant")
     priced: Mapped[set[PriceComponent]] = relationship(back_populates="restaurant")
+    orders: Mapped[set[Orders]] =relationship(back_populates="restaurant")
     created_by: Mapped[Member] = relationship(back_populates="created_restaurants")
 
 
