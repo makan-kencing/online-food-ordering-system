@@ -10,5 +10,5 @@ CREATE TABLE orders
     member_id     INT REFERENCES member (id)          NOT NULL,
     ordered_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     order_type    order_type                          NOT NULL,
-    restaurant_id INT REFERENCES restaurant (id)      NOT NULL,
+    restaurant_id INT REFERENCES restaurant (id)      NOT NULL
 );
