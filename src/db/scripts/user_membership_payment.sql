@@ -545,3 +545,9 @@ BEGIN
 END;
 
 --EXEC monthly_payment_method_summary_report(2029, 1);
+
+--index 1
+CREATE INDEX idx_pay_method_id ON payment(payment_method_id);
+
+--index 2
+CREATE INDEX idx_pay_paid_at ON payment(paid_at);
