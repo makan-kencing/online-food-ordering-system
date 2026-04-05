@@ -130,7 +130,7 @@ EXCEPTION
         RAISE;
 END;
 
---EXEC proc_subscribe_member(40,2, 98.00, 1);
+--EXEC proc_subscribe_member(61,2, 98.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
 CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
@@ -139,58 +139,83 @@ CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
     p_pay_amount     IN NUMBER,
     p_pay_method_id  IN NUMBER
 ) AS
-    v_old_sub_id      NUMBER;
-    v_old_expiry      DATE;
+    v_current_price   NUMBER;
+    v_target_price    NUMBER;
+    v_price_diff      NUMBER;
+    v_current_sub_id  NUMBER;
+    v_current_expiry  DATE;
     v_payment_id      NUMBER;
+    v_new_sub_id      NUMBER;
 BEGIN
-    SELECT id, thru_date
-    INTO v_old_sub_id, v_old_expiry
-    FROM monthly_subscription
-    WHERE member_id = p_member_id
-      AND thru_date > CURRENT_TIMESTAMP
-      AND ROWNUM = 1;
+    BEGIN
+        SELECT s.id, s.thru_date, m.price
+        INTO v_current_sub_id, v_current_expiry, v_current_price
+        FROM monthly_subscription s
+        JOIN membership m ON s.membership_id = m.id
+        WHERE s.member_id = p_member_id
+          AND CURRENT_TIMESTAMP BETWEEN s.from_date AND s.thru_date
+          AND ROWNUM = 1;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20030, 'Error: No active subscription found to upgrade.');
+    END;
 
-    INSERT INTO payment (
-        amount, paid_at, payment_method_id, ref_no, payment_method_data
-    ) VALUES (
-        p_pay_amount, CURRENT_TIMESTAMP, p_pay_method_id, 'UPGRADE',
-        '{"action": "UPGRADE", "from_member_id": ' || p_member_id || '}'
+    BEGIN
+        SELECT price INTO v_target_price
+        FROM membership
+        WHERE id = p_new_membership;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'Error: Target membership level does not exist.');
+    END;
+
+    v_price_diff := v_target_price - v_current_price;
+
+    IF v_price_diff <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20033, 'Error: Target level must be higher than current level.');
+    END IF;
+
+    IF p_pay_amount != v_price_diff THEN
+        RAISE_APPLICATION_ERROR(-20032,
+            'Error: Incorrect top-up amount. Expected difference: ' || v_price_diff ||
+            ' (Target ' || v_target_price || ' - Current ' || v_current_price || ')');
+    END IF;
+
+    INSERT INTO payment (amount, payment_method_id, ref_no, payment_method_data)
+    VALUES (
+        p_pay_amount,
+        p_pay_method_id,
+        'UPGR-DIFF-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || p_member_id,
+        '{"action": "UPGRADE_TOPUP", "from_price": ' || v_current_price || ', "to_price": ' || v_target_price || '}'
     )
     RETURNING id INTO v_payment_id;
 
-    UPDATE monthly_subscription
-    SET thru_date = CURRENT_TIMESTAMP
-    WHERE id = v_old_sub_id;
-
     INSERT INTO monthly_subscription (
-        membership_id,
-        member_id,
-        from_date,
-        thru_date,
-        payment_id
+        membership_id, member_id, from_date, thru_date
     ) VALUES (
-        p_new_membership,
-        p_member_id,
-        CURRENT_TIMESTAMP,
-        ADD_MONTHS(v_old_expiry, 1),
-        v_payment_id
+        p_new_membership, p_member_id, CURRENT_TIMESTAMP, v_current_expiry
+    )
+    RETURNING id INTO v_new_sub_id;
+
+    INSERT INTO subscription_payment (
+        payment_id,
+        monthly_subscription_id,
+        status
+    ) VALUES (
+        v_payment_id,
+        v_new_sub_id,
+        2
     );
 
     COMMIT;
-
-    DBMS_OUTPUT.PUT_LINE('--- Upgrade & Record Saved ---');
-    DBMS_OUTPUT.PUT_LINE('Old sub terminated at: ' || TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI:SS'));
-    DBMS_OUTPUT.PUT_LINE('New sub expires at: ' || TO_CHAR(ADD_MONTHS(v_old_expiry, 1), 'YYYY-MM-DD'));
+    DBMS_OUTPUT.PUT_LINE('Top-up Success! Paid RM ' || p_pay_amount || ' to upgrade to level ' || p_new_membership);
 
 EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20030, 'Error: No active subscription to upgrade.');
     WHEN OTHERS THEN
         ROLLBACK;
         RAISE;
 END;
---EXEC proc_upgrade_membership(5, 2, 5.00, 1);
+--EXEC proc_upgrade_membership(60, 1, 50.00, 1);
 
 -- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
@@ -286,14 +311,17 @@ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year I
             (SELECT COUNT(DISTINCT s.member_id)
              FROM monthly_subscription s
              JOIN member m ON s.member_id = m.id
+             JOIN subscription_payment sp ON s.id = sp.monthly_subscription_id
+             JOIN payment p ON sp.payment_id = p.id
              WHERE EXTRACT(YEAR FROM s.from_date) = p_y
                AND EXTRACT(MONTH FROM s.from_date) = p_m
                AND EXTRACT(YEAR FROM m.created_at) = p_y
-               AND EXTRACT(MONTH FROM m.created_at) = p_m) as new_subs,
+               AND EXTRACT(MONTH FROM m.created_at) = p_m
+               AND sp.status IN (1, 2)) as new_subs,
 
-            (SELECT NVL(SUM(daily_first_val), 0)
+            (SELECT NVL(SUM(daily_total), 0)
              FROM (
-                 SELECT MAX(p.amount) as daily_first_val
+                 SELECT SUM(p.amount) as daily_total
                  FROM payment p
                  JOIN subscription_payment sp ON p.id = sp.payment_id
                  JOIN monthly_subscription s  ON sp.monthly_subscription_id = s.id
@@ -301,6 +329,8 @@ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year I
                  WHERE EXTRACT(YEAR FROM s.from_date) = p_y
                    AND EXTRACT(MONTH FROM s.from_date) = p_m
                    AND EXTRACT(YEAR FROM m.created_at) = p_y
+                   AND EXTRACT(MONTH FROM m.created_at) = p_m
+                   AND sp.status IN (1, 2)
                  GROUP BY m.id, TRUNC(s.from_date)
              )) as subtotal
         FROM DUAL;
@@ -340,7 +370,7 @@ BEGIN
             NVL(SUM(amt), 0)
         INTO v_prepaid_count, v_prepaid_rev
         FROM (
-            SELECT m.id as mid, MAX(p.amount) as amt
+            SELECT m.id as mid, SUM(p.amount) as amt
             FROM payment p
             JOIN subscription_payment sp ON p.id = sp.payment_id
             JOIN monthly_subscription s  ON sp.monthly_subscription_id = s.id
@@ -349,10 +379,11 @@ BEGIN
               AND EXTRACT(MONTH FROM s.from_date) = v_month_id
               AND EXTRACT(YEAR FROM m.created_at) = v_year
               AND EXTRACT(MONTH FROM m.created_at) < v_month_id
+              AND sp.status IN (1, 2)
             GROUP BY m.id, TRUNC(s.from_date)
         );
 
-       IF v_prepaid_rev > 0 THEN
+        IF v_prepaid_rev > 0 THEN
             v_remark := TO_CHAR(v_prepaid_rev, '9,990.00');
         ELSE
             v_remark := LPAD('-', 9);
@@ -364,18 +395,18 @@ BEGIN
             v_m_conversion := 0;
         END IF;
 
-        DBMS_OUTPUT.PUT_LINE(
-            RPAD(TO_CHAR(TO_DATE(v_month_id, 'MM'), 'Month'), 15) ||
-            RPAD(rec_stats.new_join, 18) ||
-            RPAD(rec_stats.new_subs, 18) ||
-            RPAD(LPAD(TO_CHAR(rec_stats.subtotal, '9,990.00'), 10), 20) ||
-            RPAD(v_remark, 25) ||
-            LPAD(TO_CHAR(v_m_conversion, '990.99'), 8) || '%'
-        );
+       DBMS_OUTPUT.PUT_LINE(
+    RPAD(TO_CHAR(TO_DATE(v_month_id, 'MM'), 'Month'), 15) ||
+    RPAD(rec_stats.new_join, 20) ||
+    RPAD(rec_stats.new_subs, 20) ||
+    RPAD(LPAD(TO_CHAR(rec_stats.subtotal + v_prepaid_rev, '9,990.00'), 12), 20) ||
+    RPAD(LPAD(v_remark, 12), 35) ||
+    LPAD(TO_CHAR(v_m_conversion, '990.99') || '%', 10)
+);
 
         v_grand_new_join  := v_grand_new_join + rec_stats.new_join;
         v_grand_new_sub   := v_grand_new_sub + rec_stats.new_subs;
-        v_grand_total_rev := v_grand_total_rev + rec_stats.subtotal;
+        v_grand_total_rev := v_grand_total_rev + rec_stats.subtotal + v_prepaid_rev;  -- 加上 prepaid
     END LOOP;
     CLOSE cur_months;
 
@@ -395,7 +426,7 @@ BEGIN
 END;
 /
 
---exec proc_new_member_conversion_analysis(2026)
+--exec proc_new_member_conversion_analysis(2025)
 
 --REPORT -2 ：monthly_payment_method_using_summary_report
  CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (
