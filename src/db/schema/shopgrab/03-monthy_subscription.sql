@@ -36,8 +36,9 @@ BEGIN
         job_name        => 'job_reset_payment_ref_daily',
         job_type        => 'STORED_PROCEDURE',
         job_action      => 'RESET_DAILY_PAYMENT_REF',
+        start_date      => SYSTIMESTAMP,
         repeat_interval => 'FREQ=DAILY;INTERVAL=1;BYHOUR=0',
-        job_style => 'LIGHTWEIGHT',
+        enabled         => TRUE,
         comments        => 'Job that reset the payment ref_no sequence every day at midnight'
     );
 END;
