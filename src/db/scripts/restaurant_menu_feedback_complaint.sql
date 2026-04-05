@@ -400,6 +400,7 @@ CREATE INDEX idx_menu_item_restaurant_id ON menu_item(restaurant_id);
 -- Create index from feedback to order_item
 CREATE INDEX idx_feedback_order_item ON feedback(order_item_id);
 
+
 --Testing for trigger 1
 /*
 CREATE OR REPLACE PROCEDURE proc_add_order_item_feedback(
