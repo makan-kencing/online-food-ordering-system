@@ -287,6 +287,119 @@ END;
 
 commit;
 
+-- Report - 2
+-- Product feedback detailed report, can choose to display all product or display specific product
+CREATE OR REPLACE PROCEDURE proc_feedback_by_product (
+    p_product_id IN NUMBER DEFAULT NULL
+) IS
+    v_line_width CONSTANT NUMBER := 120;  -- increased for wider report
+    v_feedback_count NUMBER;
+    v_product_exists NUMBER;
+
+    CURSOR cur_products IS
+        SELECT id, name
+        FROM product
+        WHERE p_product_id IS NULL OR id = p_product_id
+        ORDER BY name;
+
+    CURSOR cur_feedback (p_product NUMBER) IS
+        SELECT f.rating, f.content, f.status
+        FROM feedback f
+                 JOIN order_item oi ON f.order_item_id = oi.id
+        WHERE oi.product_id = p_product;
+
+    rec_product cur_products%ROWTYPE;
+    rec_feedback cur_feedback%ROWTYPE;
+    v_first_row BOOLEAN;
+
+BEGIN
+    IF p_product_id IS NOT NULL THEN
+        SELECT COUNT(*) INTO v_product_exists
+        FROM product
+        WHERE id = p_product_id;
+
+        IF v_product_exists = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Product not found for ID ' || p_product_id);
+        END IF;
+    END IF;
+
+    -- Header
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('FEEDBACK REPORT BY PRODUCT', v_line_width/2 + 12));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+
+    DBMS_OUTPUT.PUT_LINE(
+            RPAD('ITEM NAME', 40) ||  -- increased from 20 to 40
+            RPAD('RATING', 10) ||
+            RPAD('REMARKS', 50) ||
+            RPAD('STATUS', 20)
+    );
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+
+    OPEN cur_products;
+    LOOP
+        FETCH cur_products INTO rec_product;
+        EXIT WHEN cur_products%NOTFOUND;
+
+        SELECT COUNT(*) INTO v_feedback_count
+        FROM feedback f
+                 JOIN order_item oi ON f.order_item_id = oi.id
+        WHERE oi.product_id = rec_product.id;
+
+        IF v_feedback_count = 0 THEN
+            CONTINUE;
+        END IF;
+
+        v_first_row := TRUE;
+
+        OPEN cur_feedback(rec_product.id);
+        LOOP
+            FETCH cur_feedback INTO rec_feedback;
+            EXIT WHEN cur_feedback%NOTFOUND;
+
+            IF v_first_row THEN
+                DBMS_OUTPUT.PUT_LINE(
+                        RPAD(rec_product.name, 40) ||  -- match header
+                        RPAD(rec_feedback.rating, 10) ||
+                        RPAD(NVL(rec_feedback.content, 'N/A'), 50) ||
+                        RPAD(rec_feedback.status, 20)
+                );
+                v_first_row := FALSE;
+            ELSE
+                DBMS_OUTPUT.PUT_LINE(
+                        RPAD('‎ ', 40) ||
+                        RPAD(rec_feedback.rating, 10) ||
+                        RPAD(NVL(rec_feedback.content, 'N/A'), 50) ||
+                        RPAD(rec_feedback.status, 20)
+                );
+            END IF;
+
+        END LOOP;
+        CLOSE cur_feedback;
+
+        DBMS_OUTPUT.PUT_LINE('‎ ‎ ‎ ‎ ‎ ');  -- empty line between products
+
+    END LOOP;
+    CLOSE cur_products;
+
+    --  footer
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('END OF REPORT', v_line_width/2 + 6));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+
+END;
+/
+
+commit;
+-- =========================
+-- Extra: index - 1
+-- Create index from menu item to restaurant
+CREATE INDEX idx_menu_item_restaurant_id ON menu_item(restaurant_id);
+
+-- Extra: index - 2
+-- Create index from feedback to order_item
+CREATE INDEX idx_feedback_order_item ON feedback(order_item_id);
+
 --Testing for trigger 1
 /*
 CREATE OR REPLACE PROCEDURE proc_add_order_item_feedback(
