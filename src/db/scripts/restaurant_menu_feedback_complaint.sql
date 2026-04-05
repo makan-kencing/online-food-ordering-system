@@ -100,7 +100,7 @@ END;
 /*/
 
 -- Procedure - 2
--- Add order item feedback
+-- Add order item feedback (image)
 CREATE OR REPLACE PROCEDURE proc_add_feedback_image (
     p_feedback_id IN feedback.id%TYPE,
     p_image_url   IN VARCHAR2
@@ -157,13 +157,19 @@ end;
 commit;*/
 
 -- Trigger - 1
--- Ensure each feedback has a rating
-CREATE OR REPLACE TRIGGER trg_feedback_rating
-    BEFORE INSERT OR UPDATE ON feedback
+-- Ensure each order items has zero or one feedback rating
+CREATE OR REPLACE TRIGGER trg_one_feedback_per_order_item
+    BEFORE INSERT ON feedback
     FOR EACH ROW
+DECLARE
+    v_count NUMBER;
 BEGIN
-    IF :NEW.rating IS NULL THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Feedback must have a rating.');
+    SELECT COUNT(*) INTO v_count
+    FROM feedback
+    WHERE order_item_id = :NEW.order_item_id;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20040, 'Only one feedback is allowed per order item.');
     END IF;
 END;
 /
@@ -280,3 +286,40 @@ END;
 /
 
 commit;
+
+--Testing for trigger 1
+/*
+CREATE OR REPLACE PROCEDURE proc_add_order_item_feedback(
+    p_order_item_id IN INT,
+    p_rating        IN INT,
+    p_content       IN VARCHAR2
+)
+AS
+    v_exists NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_exists
+    FROM order_item
+    WHERE id = p_order_item_id;
+
+    IF v_exists = 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Order Item ID does not exist.');
+    END IF;
+
+    IF p_rating < 1 OR p_rating > 10 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Rating must be between 1 and 10.');
+    END IF;
+
+    INSERT INTO feedback(order_item_id, rating, content)
+    VALUES (p_order_item_id, p_rating, p_content);
+
+    COMMIT;
+
+    DBMS_OUTPUT.PUT_LINE('Feedback added successfully for Order Item ID: ' || p_order_item_id);
+END;
+/
+
+BEGIN
+    proc_add_order_item_feedback(6, '', 'This product is great!');
+end;
+/
+COMMIT;*/
