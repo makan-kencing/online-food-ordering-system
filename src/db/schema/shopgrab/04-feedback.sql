@@ -9,3 +9,13 @@ CREATE TABLE feedback
     status        VARCHAR(20) DEFAULT 'VISIBLE'
         CHECK (status IN ('VISIBLE', 'HIDDEN', 'REPORTED'))
 );
+
+CREATE OR REPLACE TRIGGER trg_feedback_updated_at
+    BEFORE UPDATE ON feedback
+    FOR EACH ROW
+BEGIN
+    IF :NEW.updated_at IS NULL THEN
+        :NEW.updated_at := CURRENT_TIMESTAMP;
+    END IF;
+END;
+/
