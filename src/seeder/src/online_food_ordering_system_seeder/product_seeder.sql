@@ -113,21 +113,39 @@ SELECT (SELECT id FROM product_feature_group WHERE name = 'Beverage Size'),
 -- ============================================
 -- 4. PRODUCT CATEGORIES
 -- ============================================
+-- ============================================
+-- 4. PRODUCT CATEGORIES (Fixed)
+-- ============================================
+
+-- Parent Categories
 INSERT INTO product_category (name, description, parent, created_by_id) VALUES
                                                                             ('Pizzas', 'Delicious pizzas with various toppings', NULL, 1),
                                                                             ('Burgers', 'Juicy burgers with premium ingredients', NULL, 1),
                                                                             ('Beverages', 'Refreshing drinks and beverages', NULL, 1),
                                                                             ('Sides', 'Perfect side dishes', NULL, 1),
-                                                                            ('Desserts', 'Sweet treats', NULL, 1),
-                                                                            ('Veg Pizza', 'Vegetarian pizzas', (SELECT id FROM product_category WHERE name = 'Pizzas'), 1),
-                                                                            ('NonVeg Pizzas', 'Meat pizzas', (SELECT id FROM product_category WHERE name = 'Pizzas'), 1),
-                                                                            ('Specialty', 'Chef specials', (SELECT id FROM product_category WHERE name = 'Pizzas'), 1),
-                                                                            ('Chicken Burg', 'Chicken burgers', (SELECT id FROM product_category WHERE name = 'Burgers'), 1),
-                                                                            ('Beef Burgers', 'Beef burgers', (SELECT id FROM product_category WHERE name = 'Burgers'), 1),
-                                                                            ('Veggie Burg', 'Vegetarian burgers', (SELECT id FROM product_category WHERE name = 'Burgers'), 1),
-                                                                            ('Carbonated', 'Soda drinks', (SELECT id FROM product_category WHERE name = 'Beverages'), 1),
-                                                                            ('Juices', 'Fresh juices', (SELECT id FROM product_category WHERE name = 'Beverages'), 1),
-                                                                            ('Milkshakes', 'Creamy shakes', (SELECT id FROM product_category WHERE name = 'Beverages'), 1);
+                                                                            ('Desserts', 'Sweet treats', NULL, 1);
+
+-- Sub-Categories linked to Parent ID
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Veg Pizza', 'Vegetarian pizzas', id, 1 FROM product_category WHERE name = 'Pizzas' AND parent IS NULL;
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'NonVeg Pizzas', 'Meat pizzas', id, 1 FROM product_category WHERE name = 'Pizzas' AND parent IS NULL;
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Specialty', 'Chef specials', id, 1 FROM product_category WHERE name = 'Pizzas' AND parent IS NULL;
+
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Chicken Burg', 'Chicken burgers', id, 1 FROM product_category WHERE name = 'Burgers' AND parent IS NULL;
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Beef Burgers', 'Beef burgers', id, 1 FROM product_category WHERE name = 'Burgers' AND parent IS NULL;
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Veggie Burg', 'Vegetarian burgers', id, 1 FROM product_category WHERE name = 'Burgers' AND parent IS NULL;
+
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Carbonated', 'Soda drinks', id, 1 FROM product_category WHERE name = 'Beverages' AND parent IS NULL;
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Juices', 'Fresh juices', id, 1 FROM product_category WHERE name = 'Beverages' AND parent IS NULL;
+INSERT INTO product_category (name, description, parent, created_by_id)
+SELECT 'Milkshakes', 'Creamy shakes', id, 1 FROM product_category WHERE name = 'Beverages' AND parent IS NULL;
 
 -- ============================================
 -- 5. PRODUCTS
