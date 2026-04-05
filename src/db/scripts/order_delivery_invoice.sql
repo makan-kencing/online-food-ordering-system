@@ -156,3 +156,81 @@ EXCEPTION
         DBMS_OUTPUT.PUT_LINE('Detail: ' || SQLERRM);
 END;
 /
+
+--TRIGGER 1
+--Lock Orders once placed
+CREATE OR REPLACE TRIGGER trg_order_item_lock
+    BEFORE INSERT OR UPDATE OR DELETE ON order_item
+    FOR EACH ROW
+DECLARE
+    v_locked NUMBER;
+    v_id order_item.order_id%TYPE;
+BEGIN
+    -- Get the Order ID 
+    v_id := NVL(:NEW.order_id, :OLD.order_id);
+
+    -- Check if an invoice exists for this order
+    SELECT COUNT(*) INTO v_locked
+    FROM invoice
+    WHERE order_id = v_id;
+
+    IF v_locked > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Order cannot be modified once placed');
+    END IF;
+END;
+/
+
+
+--TRIGGER 2
+--Each order can have order_items from the same restaurant
+CREATE OR REPLACE TRIGGER trg_order_item_shop
+    FOR INSERT OR UPDATE ON order_item
+    COMPOUND TRIGGER
+
+    TYPE t_order_set IS TABLE OF BOOLEAN INDEX BY PLS_INTEGER;
+    v_orders t_order_set;
+
+BEFORE EACH ROW IS
+BEGIN
+    IF :NEW.order_id IS NOT NULL THEN
+        v_orders(:NEW.order_id) := TRUE;
+    END IF;
+END BEFORE EACH ROW;
+
+    AFTER STATEMENT IS
+        v_valid_shops NUMBER;
+        v_id PLS_INTEGER;
+    BEGIN
+        v_id := v_orders.FIRST;
+
+        WHILE v_id IS NOT NULL LOOP
+                -- Check if there is a restaurant that sells ALL products currently in the order
+                SELECT COUNT(*) INTO v_valid_shops
+                FROM (
+                         SELECT m.restaurant_id
+                         FROM order_item o
+                                  JOIN menu_item m ON o.product_id = m.product_id
+                         WHERE o.order_id = v_id
+                         GROUP BY m.restaurant_id
+                         -- Ensure this restaurant covers every order item in the cart
+                         HAVING COUNT(DISTINCT o.product_id) = (
+                             SELECT COUNT(DISTINCT product_id)
+                             FROM order_item
+                             WHERE order_id = v_id
+                         )
+                     );
+                IF v_valid_shops = 0 THEN
+                    RAISE_APPLICATION_ERROR(-20002, 'All order items must be from the same shop.');
+                END IF;
+
+                v_id := v_orders.NEXT(v_id);
+            END LOOP;
+
+        v_orders.DELETE;
+    END AFTER STATEMENT;
+
+    END trg_order_item_shop;
+/
+
+
+
