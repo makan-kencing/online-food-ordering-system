@@ -352,10 +352,10 @@ BEGIN
             GROUP BY m.id, TRUNC(s.from_date)
         );
 
-        IF v_prepaid_rev > 0 THEN
+       IF v_prepaid_rev > 0 THEN
             v_remark := TO_CHAR(v_prepaid_rev, '9,990.00');
         ELSE
-            v_remark := '-';
+            v_remark := LPAD('-', 9);
         END IF;
 
         IF rec_stats.new_join > 0 THEN
@@ -366,10 +366,10 @@ BEGIN
 
         DBMS_OUTPUT.PUT_LINE(
             RPAD(TO_CHAR(TO_DATE(v_month_id, 'MM'), 'Month'), 15) ||
-            RPAD(rec_stats.new_join, 20) ||
-            RPAD(rec_stats.new_subs, 20) ||
-            RPAD(LPAD(TO_CHAR(rec_stats.subtotal, '9,990.00'), 10), 15) ||
-            RPAD(v_remark, 35) ||
+            RPAD(rec_stats.new_join, 18) ||
+            RPAD(rec_stats.new_subs, 18) ||
+            RPAD(LPAD(TO_CHAR(rec_stats.subtotal, '9,990.00'), 10), 20) ||
+            RPAD(v_remark, 25) ||
             LPAD(TO_CHAR(v_m_conversion, '990.99'), 8) || '%'
         );
 
