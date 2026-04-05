@@ -34,6 +34,8 @@ CREATE TABLE price_component
             membership_id, voucher_id, vendor_id)
 );
 
+create index idx_price_time_range on price_component (from_date, thru_date);
+
 create sequence seq_daily_price_index
     start with 1
     increment by 1

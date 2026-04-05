@@ -9,3 +9,5 @@ CREATE TABLE voucher
     created_by_id INT REFERENCES member (id)          NOT NULL,
     CHECK ( thru_date is null or thru_date > from_date )
 );
+
+create index idx_voucher_time_range on voucher (from_date, thru_date);
