@@ -82,6 +82,21 @@ begin
             raise_application_error(-20300, 'Base price must be bound to a product or a product feature');
         end if;
     end if;
+
+    if coalesce(:new.product_id, :new.product_feature_id) and :new.order_value_id is not null
+    then
+        raise_application_error(-20300, 'Order value is not compatible with product or a product feature');
+    end if;
+
+    if coalesce(:new.product_id, :new.product_feature_id) and :new.vendor_id is not null
+    then
+        raise_application_error(-20300, 'Delivery vendor is not compatible with product or a product feature');
+    end if;
+
+    if not coalesce(:new.product_id, :new.product_feature_id) and :new.quantity_break_id is not null
+    then
+        raise_application_error(-20300, 'Quantity break has to be bound with product or a product feature');
+    end if;
 end;
 /
 
