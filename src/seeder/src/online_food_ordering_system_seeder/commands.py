@@ -338,7 +338,7 @@ class Seeder:
 
     def seed_memberships(self) -> None:
         members = self.tables[models.Member]
-        for member in random.choices(members, k=len(members) // 10):
+        for member in random.choices(members, k=len(members) // 8):
             membership = random.choice(self.tables[models.Membership])
             payment_method = random.choice(self.tables[models.PaymentMethod])
 
@@ -363,10 +363,11 @@ class Seeder:
                     from_date=current_dt,
                     thru_date=current_dt + timedelta(days=30)
                 )
-                member.subscriptions.add(models.SubscriptionPayment(
+                subscription.payments.add(models.SubscriptionPayment(
                     payment=payment,
                     monthly_subscription=subscription
                 ))
+                member.subscriptions.add(subscription)
                 current_dt += timedelta(days=30)
 
         self.session.commit()
