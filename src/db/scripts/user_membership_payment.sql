@@ -188,8 +188,8 @@ BEGIN
     )
     RETURNING id INTO v_payment_id;
 
-    INSERT INTO SUBSCRIPTION_PAYMENT(monthly_subscription_id, payment_id, status)
-    VALUES (v_payment_id, v_old_membership_id, 1);
+    INSERT INTO SUBSCRIPTION_PAYMENT(monthly_subscription_id, payment_id)
+    VALUES (v_payment_id, v_old_membership_id);
 
     UPDATE MONTHLY_SUBSCRIPTION
     SET MEMBERSHIP_ID = v_upgrade_membership_id
@@ -363,7 +363,6 @@ BEGIN
               AND EXTRACT(MONTH FROM s.from_date) = v_month_id
               AND EXTRACT(YEAR FROM m.created_at) = v_year
               AND EXTRACT(MONTH FROM m.created_at) < v_month_id
-              AND sp.status IN (1, 2)
             GROUP BY m.id, TRUNC(s.from_date)
         );
 
