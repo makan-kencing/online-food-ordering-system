@@ -70,7 +70,7 @@ class Seeder:
             .where(models.PriceComponent.from_date < self.now) \
             .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now) \
             .order_by(models.PriceComponent.from_date)
-        price: models.PriceComponent = self.session.scalars(stmt).one()
+        price: models.PriceComponent = self.session.scalars(stmt).first()
         assert price.amount is not None
         return price.amount
 
@@ -89,7 +89,7 @@ class Seeder:
             .where(models.PriceComponent.from_date < self.now) \
             .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now) \
             .order_by(models.PriceComponent.from_date)
-        price: models.PriceComponent = self.session.scalars(stmt).one()
+        price: models.PriceComponent = self.session.scalars(stmt).first()
         assert price.amount is not None
         return price.amount
 
@@ -565,7 +565,7 @@ class Seeder:
                         product = self.session.scalars(
                             select(models.Product)
                             .where(models.Product.created_by_id == restaurant.created_by_id)
-                        ).one()
+                        ).first()
                         use_restaurant = random.randint(1, 4) == 1
                         use_quantity_break = random.randint(1, 5) == 1
 
@@ -597,7 +597,7 @@ class Seeder:
                         product_feature = self.session.scalars(
                             select(models.ProductFeature)
                             .where(models.ProductFeature.created_by_id == restaurant.created_by_id)
-                        ).one()
+                        ).first()
                         use_restaurant = random.randint(1, 4) == 1
 
                         voucher = make_generic_voucher(f"f{product_feature.name} Discount {i}", f"{value} off any purchases with {product_feature.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
