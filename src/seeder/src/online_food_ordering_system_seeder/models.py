@@ -237,7 +237,7 @@ class Orders(Base, HasId):
             amount = adjustment.percentage * total if adjustment.percentage else adjustment.amount
             total += m * amount
 
-        return total
+        return max(total, Decimal(0))
 
 
 class Payment(Base, HasId):
@@ -414,7 +414,7 @@ class OrderItem(Base, HasId):
             m = -1 if adjustment.adjustment_type == OrderItemAdjustment.AdjustmentType.DISCOUNT else 1
             amount = adjustment.percentage * total if adjustment.percentage else adjustment.amount
             total += m * amount
-        return total
+        return max(total, Decimal(0))
 
 
 class PriceComponent(Base, HasId):
