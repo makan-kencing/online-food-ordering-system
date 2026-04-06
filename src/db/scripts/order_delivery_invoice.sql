@@ -55,16 +55,15 @@ CREATE OR REPLACE PROCEDURE proc_dispatch_order (
     v_dispatch_time       TIMESTAMP := CURRENT_TIMESTAMP;
     v_estimated_arrive_at TIMESTAMP := v_dispatch_time + INTERVAL '30' MINUTE;
 BEGIN
-    -- Check if the order actually exists AND is a delivery order
+    -- Check if the order actually exists AND is a delivery order (Assuming 1 = Delivery)
     BEGIN
         SELECT 1 INTO v_order_exists
         FROM orders
-        WHERE id = p_order_id AND order_type = order_type.DELIVERY;
+        WHERE id = p_order_id AND order_type = 1;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20001, 'Cannot dispatch: Order ID ' || p_order_id || ' does not exist or is a PICKUP order.');
+            RAISE_APPLICATION_ERROR(-20001, 'Cannot dispatch: Order ID ' || p_order_id || ' does not exist or is not a DELIVERY order.');
     END;
-
 
     INSERT INTO delivery (
         order_id,
@@ -85,10 +84,10 @@ BEGIN
 
     DBMS_OUTPUT.PUT_LINE('-----------------------------------');
     DBMS_OUTPUT.PUT_LINE('Successfully dispatched order.');
-    DBMS_OUTPUT.PUT_LINE('Order ID: ' || p_order_id || 'Created Delivery ID: ' || v_delivery_id);
+    DBMS_OUTPUT.PUT_LINE('Order ID          : ' || p_order_id);
     DBMS_OUTPUT.PUT_LINE('Created Delivery ID: ' || v_delivery_id);
-    DBMS_OUTPUT.PUT_LINE('Ordered At: ' || TO_CHAR(v_dispatch_time, 'YYYY-MM-DD HH24:MI:SS'));
-    DBMS_OUTPUT.PUT_LINE('Estimated Arrival: ' || TO_CHAR(v_estimated_arrive_at, 'YYYY-MM-DD HH24:MI:SS'));
+    DBMS_OUTPUT.PUT_LINE('Ordered At        : ' || TO_CHAR(v_dispatch_time, 'YYYY-MM-DD HH24:MI:SS'));
+    DBMS_OUTPUT.PUT_LINE('Estimated Arrival : ' || TO_CHAR(v_estimated_arrive_at, 'YYYY-MM-DD HH24:MI:SS'));
     DBMS_OUTPUT.PUT_LINE('-----------------------------------');
 
 EXCEPTION
@@ -180,7 +179,6 @@ BEGIN
 END;
 /
 
-
 --TRIGGER 2
 --Each order can have order_items from the same restaurant
 CREATE OR REPLACE TRIGGER trg_order_item_shop
@@ -234,3 +232,364 @@ END BEFORE EACH ROW;
 
 
 
+-- REPORT 1
+-- Restaurant performance summary report
+CREATE OR REPLACE PROCEDURE proc_vendor_report (
+    p_month IN NUMBER DEFAULT NULL, 
+    p_year  IN NUMBER DEFAULT NULL  
+) AS
+
+    v_item_count        NUMBER;
+    v_total_orders      NUMBER := 0;
+    v_vendor_order_count  NUMBER := 0;
+    v_top_vendor_name    delivery_vendor.name%TYPE := 'N/A';
+    v_top_vendor_orders  NUMBER := 0;
+    v_active_vendors     NUMBER := 0;
+
+    
+    v_restaurant_name   restaurant.name%TYPE;
+    v_state             address.state%TYPE;
+    v_country           address.country%TYPE;
+        
+    v_start_date        DATE := NULL;
+    v_end_date          DATE := NULL;
+    v_report_date_title VARCHAR2(50) := 'ALL-TIME';
+
+
+
+    CURSOR cur_vendors IS
+        SELECT id, name FROM delivery_vendor ORDER BY id;
+
+    CURSOR cur_vendor_deliveries (p_vendor_id NUMBER, p_start DATE, p_end DATE) IS
+        SELECT o.id AS order_id,
+               TO_CHAR(o.ordered_at, 'DD-MON-YYYY HH:MI AM') AS formatted_date
+        FROM orders o
+                 JOIN delivery d ON o.id = d.order_id
+        WHERE d.vendor_id = p_vendor_id
+          AND o.order_type = 1
+          AND (p_start IS NULL OR o.ordered_at >= p_start)
+          AND (p_end IS NULL OR o.ordered_at < p_end)
+        ORDER BY o.ordered_at DESC;
+
+    
+    CURSOR cur_order_items (p_order_id NUMBER) IS
+        SELECT oi.product_id, p.name AS product_name, oi.quantity
+        FROM order_item oi
+                 JOIN product p ON oi.product_id = p.id
+        WHERE oi.order_id = p_order_id;
+
+BEGIN
+    IF p_year IS NOT NULL AND p_month IS NOT NULL THEN
+        v_start_date := TO_DATE(p_year || '-' || LPAD(p_month, 2, '0') || '-01', 'YYYY-MM-DD');
+        v_end_date := ADD_MONTHS(v_start_date, 1);
+        v_report_date_title := TO_CHAR(v_start_date, 'MONTH YYYY');
+    END IF;
+
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 100, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('SHOPGRAB DELIVERY AUDIT REPORT', 68));
+    DBMS_OUTPUT.PUT_LINE(LPAD('Report Period: ' || TRIM(v_report_date_title), 62));
+    DBMS_OUTPUT.PUT_LINE(LPAD('Run Date: ' || TO_CHAR(CURRENT_TIMESTAMP, 'YYYY-MM-DD HH24:MI'), 62));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 100, '='));
+
+    
+    FOR rec_vendor IN cur_vendors LOOP
+
+            v_vendor_order_count := 0;
+            DBMS_OUTPUT.PUT_LINE(CHR(10));
+            DBMS_OUTPUT.PUT_LINE(RPAD('+', 100, '+'));
+            DBMS_OUTPUT.PUT_LINE(' DELIVERY PARTNER: ' || UPPER(rec_vendor.name));
+            DBMS_OUTPUT.PUT_LINE(RPAD('+', 100, '+'));
+
+            
+            FOR rec_order IN cur_vendor_deliveries(rec_vendor.id, v_start_date, v_end_date) LOOP
+
+                    SELECT COUNT(*) INTO v_item_count
+                    FROM order_item
+                    WHERE order_id = rec_order.order_id;
+
+                    IF v_item_count > 0 THEN
+                        v_total_orders := v_total_orders + 1;
+                        v_vendor_order_count := v_vendor_order_count + 1;
+
+                        -- Get restaurant + location
+                        BEGIN
+                            SELECT r.name, a.state, a.country
+                            INTO v_restaurant_name, v_state, v_country
+                            FROM order_item oi
+                                     JOIN menu_item m ON oi.product_id = m.product_id
+                                     JOIN restaurant r ON r.id = m.restaurant_id
+                                     JOIN address a ON r.address_id = a.id
+                            WHERE oi.order_id = rec_order.order_id
+                                FETCH FIRST 1 ROW ONLY;
+                        EXCEPTION
+                            WHEN NO_DATA_FOUND THEN
+                                v_restaurant_name := 'N/A';
+                                v_state := 'N/A';
+                                v_country := 'N/A';
+                        END;
+
+                        DBMS_OUTPUT.PUT_LINE(CHR(10) || ' [ORDER #' || RPAD(rec_order.order_id, 6) || '] | DATE: ' || rec_order.formatted_date);
+                        DBMS_OUTPUT.PUT_LINE(' Restaurant : ' || v_restaurant_name);
+                        DBMS_OUTPUT.PUT_LINE(' Location   : ' || v_state || ', ' || v_country);
+                        DBMS_OUTPUT.PUT_LINE(' Total Items: ' || v_item_count);
+                        DBMS_OUTPUT.PUT_LINE(RPAD('-', 100, '-'));
+                        DBMS_OUTPUT.PUT_LINE('    ' || RPAD('PRODUCT', 40) || ' | ' || LPAD('QTY', 5));
+                        DBMS_OUTPUT.PUT_LINE('    ' || RPAD('-', 50, '-'));
+
+                        -- ITEMS 
+                        FOR rec_item IN cur_order_items(rec_order.order_id) LOOP
+                                DBMS_OUTPUT.PUT_LINE('    ' || RPAD(rec_item.product_id || '. ' || rec_item.product_name, 40) || ' | ' || LPAD(rec_item.quantity, 5));
+                            END LOOP;
+
+                        DBMS_OUTPUT.PUT_LINE(RPAD('-', 100, '-'));
+                    END IF;
+                END LOOP;
+
+            
+            IF v_vendor_order_count = 0 THEN
+                DBMS_OUTPUT.PUT_LINE(CHR(10) || '    -> No active deliveries logged for this partner in this period.');
+            END IF;
+
+            -- Track active vendors
+            IF v_vendor_order_count > 0 THEN
+                v_active_vendors := v_active_vendors + 1;
+            END IF;
+
+            -- Track top performer
+            IF v_vendor_order_count > v_top_vendor_orders THEN
+                v_top_vendor_orders := v_vendor_order_count;
+                v_top_vendor_name := rec_vendor.name;
+            END IF;
+
+            -- Vendor Summary
+            DBMS_OUTPUT.PUT_LINE(RPAD('-', 100, '-'));
+            DBMS_OUTPUT.PUT_LINE(' TOTAL DELIVERY ORDERS FOR ' || UPPER(rec_vendor.name) || ': ' || v_vendor_order_count);
+            DBMS_OUTPUT.PUT_LINE(RPAD('-', 100, '-'));
+
+        END LOOP;
+
+    
+    DBMS_OUTPUT.PUT_LINE(CHR(10) || RPAD('=', 100, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('REPORT SUMMARY', 57));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 100, '='));
+    DBMS_OUTPUT.PUT_LINE(' TOTAL DELIVERY ORDERS FOUND : ' || v_total_orders);
+    DBMS_OUTPUT.PUT_LINE(' ACTIVE DELIVERY PARTNERS   : ' || v_active_vendors);
+    DBMS_OUTPUT.PUT_LINE(' TOP PERFORMING PARTNER     : ' || UPPER(v_top_vendor_name));
+    DBMS_OUTPUT.PUT_LINE(' ORDERS COMPLETED           : ' || v_top_vendor_orders);
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 100, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('*** END OF REPORT ***', 60));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 100, '='));
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An error occurred: ' || SQLERRM);
+END;
+/
+
+--REPORT 2
+
+CREATE OR REPLACE PROCEDURE proc_top_selling_items (
+    p_month IN NUMBER DEFAULT NULL, 
+    p_year  IN NUMBER DEFAULT NULL  
+) AS
+
+    v_has_sales             NUMBER := 0;
+    v_global_revenue        NUMBER := 0;
+    v_global_qty            NUMBER := 0;
+    v_active_restaurants    NUMBER := 0;
+
+    v_best_restaurant       VARCHAR2(100);
+    v_best_restaurant_revenue NUMBER := 0;
+
+    v_best_product          VARCHAR2(100);
+    v_best_product_qty      NUMBER := 0;
+
+    -- Aggregation variables per restaurant
+    v_total_qty             NUMBER;
+    v_total_revenue         NUMBER;
+    v_top_product           VARCHAR2(100);
+    v_top_qty               NUMBER;
+
+    -- Date Filter Variables
+    v_start_date            DATE := NULL;
+    v_end_date              DATE := NULL;
+    v_report_title_date     VARCHAR2(50) := 'ALL-TIME';
+
+BEGIN
+    
+    IF p_year IS NOT NULL AND p_month IS NOT NULL THEN
+        -- Create the 1st day of the requested month
+        v_start_date := TO_DATE(p_year || '-' || LPAD(p_month, 2, '0') || '-01', 'YYYY-MM-DD');
+        -- The end date is exactly 1 month later
+        v_end_date := ADD_MONTHS(v_start_date, 1);
+
+        -- Update the title so the user knows what they are looking at
+        v_report_title_date := TO_CHAR(v_start_date, 'MONTH YYYY');
+    END IF;
+
+    
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 85, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('RESTAURANT REVENUE & TOP-SELLERS ANALYTICS', 62));
+    DBMS_OUTPUT.PUT_LINE(LPAD('Report Period: ' || TRIM(v_report_title_date), 62));
+    DBMS_OUTPUT.PUT_LINE(LPAD('Run Date: ' || TO_CHAR(SYSDATE, 'DD-MON-YYYY HH24:MI'), 61));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 85, '='));
+
+    
+    FOR rec_vendor IN (
+        SELECT id, name
+        FROM restaurant
+        ORDER BY name
+        ) LOOP
+
+            v_has_sales := 0;
+            v_total_qty := 0;
+            v_total_revenue := 0;
+            v_top_product := 'None';
+            v_top_qty := 0;
+
+            -- VENDOR HEADER
+            DBMS_OUTPUT.PUT_LINE(CHR(10) || RPAD('+', 85, '+'));
+            DBMS_OUTPUT.PUT_LINE('| ' || RPAD('  RESTAURANT: ' || UPPER(rec_vendor.name), 81) || ' |');
+            DBMS_OUTPUT.PUT_LINE(RPAD('+', 85, '+'));
+
+            
+            FOR rec_sum IN (
+                SELECT
+                    p.name,
+                    SUM(oi.quantity) AS total_qty,
+                    SUM(oi.quantity * oi.unit_price) AS total_revenue
+                FROM order_item oi
+                         JOIN orders o ON oi.order_id = o.id  
+                         JOIN product p ON oi.product_id = p.id
+                         JOIN menu_item m ON p.id = m.product_id
+                WHERE m.restaurant_id = rec_vendor.id
+                  AND (v_start_date IS NULL OR o.ordered_at >= v_start_date)
+                  AND (v_end_date IS NULL OR o.ordered_at < v_end_date)
+                GROUP BY p.name
+                ) LOOP
+                    v_total_qty := v_total_qty + rec_sum.total_qty;
+                    v_total_revenue := v_total_revenue + rec_sum.total_revenue;
+
+                    -- Track top product for this restaurant
+                    IF rec_sum.total_qty > v_top_qty THEN
+                        v_top_qty := rec_sum.total_qty;
+                        v_top_product := rec_sum.name;
+                    END IF;
+
+                    -- Track global best product
+                    IF rec_sum.total_qty > v_best_product_qty THEN
+                        v_best_product_qty := rec_sum.total_qty;
+                        v_best_product := rec_sum.name;
+                    END IF;
+
+                    v_has_sales := 1;
+                END LOOP;
+
+            
+            IF v_has_sales = 0 THEN
+                DBMS_OUTPUT.PUT_LINE('    -> No sales data registered for this restaurant in this period.');
+                CONTINUE;
+            END IF;
+
+            
+            v_active_restaurants := v_active_restaurants + 1;
+
+            
+            DBMS_OUTPUT.PUT_LINE('  [ PERFORMANCE SUMMARY ]');
+            DBMS_OUTPUT.PUT_LINE('    Total Items Sold : ' || v_total_qty || ' units');
+            DBMS_OUTPUT.PUT_LINE('    Total Revenue    : RM ' || TO_CHAR(v_total_revenue, 'FM999,990.00'));
+            DBMS_OUTPUT.PUT_LINE('    Top Product      : ' || v_top_product || ' (' || v_top_qty || ' sold)');
+            DBMS_OUTPUT.PUT_LINE('  ' || RPAD('-', 81, '-'));
+            DBMS_OUTPUT.PUT_LINE(
+                    '    ' || RPAD('PRODUCT NAME', 40) ||
+                    ' | ' || LPAD('QTY', 6) ||
+                    ' | ' || LPAD('REVENUE', 12)
+            );
+            DBMS_OUTPUT.PUT_LINE('    ' || RPAD('-', 64, '-'));
+
+            
+            FOR rec_item IN (
+                SELECT *
+                FROM (
+                         SELECT
+                             p.name AS product_name,
+                             SUM(oi.quantity) AS total_qty,
+                             SUM(oi.quantity * oi.unit_price) AS total_revenue
+                         FROM order_item oi
+                                  JOIN orders o ON oi.order_id = o.id
+                                  JOIN product p ON oi.product_id = p.id
+                                  JOIN menu_item m ON p.id = m.product_id
+                         WHERE m.restaurant_id = rec_vendor.id
+                           AND (v_start_date IS NULL OR o.ordered_at >= v_start_date)
+                           AND (v_end_date IS NULL OR o.ordered_at < v_end_date)
+                         GROUP BY p.name
+                         ORDER BY total_qty DESC, total_revenue DESC
+                     )
+                WHERE ROWNUM <= 5
+                ) LOOP
+                    
+                    DBMS_OUTPUT.PUT_LINE(
+                            '  ▶ ' || RPAD(rec_item.product_name, 40) ||
+                            ' | ' || LPAD(rec_item.total_qty, 6) ||
+                            ' | RM ' || LPAD(TO_CHAR(rec_item.total_revenue, 'FM999,990.00'), 9)
+                    );
+                END LOOP;
+
+            -- Update global totals
+            v_global_qty := v_global_qty + v_total_qty;
+            v_global_revenue := v_global_revenue + v_total_revenue;
+
+            -- Track best restaurant
+            IF v_total_revenue > v_best_restaurant_revenue THEN
+                v_best_restaurant_revenue := v_total_revenue;
+                v_best_restaurant := rec_vendor.name;
+            END IF;
+
+        END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE(CHR(10) || RPAD('=', 85, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('GLOBAL PERFORMANCE SUMMARY', 56));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 85, '='));
+
+    -- Top Performers
+    DBMS_OUTPUT.PUT_LINE('  Most Performant Restaurant : ' || NVL(v_best_restaurant, 'N/A'));
+    DBMS_OUTPUT.PUT_LINE('  Revenue Generated          : RM ' || TO_CHAR(v_best_restaurant_revenue, 'FM999,990.00'));
+
+    DBMS_OUTPUT.PUT_LINE(CHR(10) || '  Most Bought Item           : ' || NVL(v_best_product, 'N/A'));
+    DBMS_OUTPUT.PUT_LINE('  Total Quantity Sold        : ' || v_best_product_qty || ' units');
+
+    -- Platform Metrics
+    DBMS_OUTPUT.PUT_LINE(CHR(10) || '  Platform Metrics:');
+    DBMS_OUTPUT.PUT_LINE('     Total Items Sold        : ' || v_global_qty || ' units');
+    DBMS_OUTPUT.PUT_LINE('     Total Gross Revenue     : RM ' || TO_CHAR(v_global_revenue, 'FM999,990.00'));
+
+    -- Prevent Divide by Zero error if there are no sales yet
+    IF v_active_restaurants > 0 THEN
+        DBMS_OUTPUT.PUT_LINE('     Avg Revenue per Vendor  : RM ' || TO_CHAR(v_global_revenue / v_active_restaurants, 'FM999,990.00'));
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('     Avg Revenue per Vendor  : RM 0.00');
+    END IF;
+
+    
+    -- FOOTER
+    DBMS_OUTPUT.PUT_LINE(CHR(10) || RPAD('=', 85, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('*** END OF ANALYTICS REPORT ***', 58));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', 85, '='));
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Critical Analytics Error: ' || SQLERRM);
+
+END;
+/
+
+
+--The Order Queue Index
+CREATE INDEX idx_order_queue
+    ON orders (ordered_at DESC, order_type);
+
+
+--The Cart Index
+
+CREATE INDEX idx_order_cart
+    ON order_item (order_id, product_id);
