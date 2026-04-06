@@ -75,7 +75,7 @@ create trigger trg_validate_price_component_type
     on price_component
     for each row
 begin
-    if :new.price_type = price_type.base
+    if :new.price_type = 1
     then
         if coalesce(:new.product_id, :new.product_feature_id) is null or :new.amount is null
         then

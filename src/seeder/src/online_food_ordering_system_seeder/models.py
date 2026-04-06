@@ -498,6 +498,7 @@ class Feedback(Base, HasId):
     status: Mapped[FeedbackType] = mapped_column(SAEnum(FeedbackType, native_enum=False), default=FeedbackType.VISIBLE)
 
     order_item: Mapped[OrderItem] = relationship(back_populates="feedback")
+    images: Mapped[set[FeedbackImage]] = relationship(back_populates="feedback")
 
 
 class OrderItemAdjustment(Base, HasId):
