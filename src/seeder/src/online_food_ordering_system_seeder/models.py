@@ -482,12 +482,20 @@ class ProductFeatureGroupField(Base):
     )
 
 
-class Feedback(Base):
+class Feedback(Base, HasId):
+    class FeedbackType(Enum):
+        VISIBLE = auto()
+        HIDDEN = auto()
+        REPORTED = auto()
+
     __tablename__ = "feedback"
 
-    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"), primary_key=True)
-    content: Mapped[str] = mapped_column(LONG_STRING)
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"), unique=True)
     rating: Mapped[int]
+    content: Mapped[str | None] = mapped_column(LONG_STRING)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(server_onupdate=func.now())
+    status: Mapped[FeedbackType] = mapped_column(SAEnum(FeedbackType, native_enum=False), default=FeedbackType.VISIBLE)
 
     order_item: Mapped[OrderItem] = relationship(back_populates="feedback")
 
@@ -560,3 +568,13 @@ class VoucherRedemption(Base):
     __table_args__ = (
         PrimaryKeyConstraint("voucher_distribution_id", "invoice_id"),
     )
+
+
+class FeedbackImage(Base, HasId):
+    __tablename__ = "feedback_image"
+
+    feedback_id: Mapped[int] = mapped_column(ForeignKey("feedback.id"))
+    image_url: Mapped[str] = mapped_column(String(500))
+    uploaded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    feedback: Mapped[Feedback] = relationship(back_populates="images")
