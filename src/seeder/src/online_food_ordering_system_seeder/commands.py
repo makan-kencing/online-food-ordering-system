@@ -620,18 +620,6 @@ class Seeder:
 
         self.session.commit()
 
-    def seed_voucher_distributions(self) -> None:
-        members = self.tables[models.Member]
-        for voucher in self.tables[models.Voucher]:
-            for member in random.choices(members, k=len(members) // 10):
-                distribution = models.VoucherDistribution(
-                    voucher=voucher,
-                    member=member
-                )
-                voucher.distributed_to.add(distribution)
-                member.vouchers.add(distribution)
-        self.session.commit()
-
     def seed_orders(self) -> None:
         for member in self.tables[models.Member]:
             days = pl.date_range(start=member.created_at, end=self.now, interval="1d", eager=True)
