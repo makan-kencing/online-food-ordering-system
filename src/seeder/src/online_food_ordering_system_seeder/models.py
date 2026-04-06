@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from enum import Enum, auto
+from enum import Enum
 from typing import Any
 
 from sqlalchemy import String, Numeric, DateTime, ForeignKey, Interval, Enum as SAEnum, PrimaryKeyConstraint, \
@@ -208,14 +208,14 @@ class MemberAddress(Base):
 
 class Orders(Base, HasId):
     class OrderType(Enum):
-        DELIVERY = auto()
-        PICKUP = auto()
+        DELIVERY = 1
+        PICKUP = 2
 
     __tablename__ = "orders"
 
     member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
     ordered_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
-    order_type: Mapped[OrderType] = mapped_column(SAEnum(OrderType))
+    order_type: Mapped[OrderType] = mapped_column(SAEnum(OrderType, values_callable=lambda x: [str(i.value) for i in x]))
     restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurant.id"))
 
     member: Mapped[Member] = relationship(back_populates="orders")
@@ -419,13 +419,13 @@ class OrderItem(Base, HasId):
 
 class PriceComponent(Base, HasId):
     class PriceType(Enum):
-        BASE = auto()
-        DISCOUNT = auto()
-        SURCHARGE = auto()
+        BASE = 1
+        DISCOUNT = 2
+        SURCHARGE = 3
 
     __tablename__ = "price_component"
 
-    price_type: Mapped[PriceType] = mapped_column(SAEnum(PriceType))
+    price_type: Mapped[PriceType] = mapped_column(SAEnum(PriceType, values_callable=lambda x: [str(i.value) for i in x]))
     from_date: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
     thru_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     description: Mapped[str] = mapped_column(LONG_STRING)
@@ -484,9 +484,9 @@ class ProductFeatureGroupField(Base):
 
 class Feedback(Base, HasId):
     class FeedbackType(Enum):
-        VISIBLE = auto()
-        HIDDEN = auto()
-        REPORTED = auto()
+        VISIBLE = 1
+        HIDDEN = 2
+        REPORTED = 3
 
     __tablename__ = "feedback"
 
@@ -503,18 +503,18 @@ class Feedback(Base, HasId):
 
 class OrderItemAdjustment(Base, HasId):
     class AdjustmentType(Enum):
-        DISCOUNT = auto()
-        SURCHARGE = auto()
-        SALES_TAX = auto()
-        SHIPPING = auto()
-        FEE = auto()
-        MISCELLANEOUS = auto()
+        DISCOUNT = 1
+        SURCHARGE = 2
+        SALES_TAX = 3
+        SHIPPING = 4
+        FEE = 5
+        MISCELLANEOUS = 6
 
     __tablename__ = "order_item_adjustment"
 
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     order_item_id: Mapped[int | None] = mapped_column(ForeignKey("order_item.id"))
-    adjustment_type: Mapped[AdjustmentType] = mapped_column(SAEnum(AdjustmentType))
+    adjustment_type: Mapped[AdjustmentType] = mapped_column(SAEnum(AdjustmentType, values_callable=lambda x: [str(i.value) for i in x]))
     amount: Mapped[Decimal | None] = mapped_column(Numeric())
     percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
 
