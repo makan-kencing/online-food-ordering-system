@@ -130,7 +130,7 @@ EXCEPTION
         RAISE;
 END;
 
---EXEC proc_subscribe_member(61,2, 98.00, 1);
+--EXEC proc_subscribe_member(59,2, 98.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
 
@@ -201,7 +201,7 @@ EXCEPTION
         ROLLBACK;
         RAISE;
 END;
---EXEC proc_upgrade_membership(60, 1, 50.00, 1);
+--EXEC proc_upgrade_membership(59, 1, 50.00, 1);
 
 -- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
@@ -302,8 +302,7 @@ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year I
              WHERE EXTRACT(YEAR FROM s.from_date) = p_y
                AND EXTRACT(MONTH FROM s.from_date) = p_m
                AND EXTRACT(YEAR FROM m.created_at) = p_y
-               AND EXTRACT(MONTH FROM m.created_at) = p_m
-               AND sp.status IN (1, 2)) as new_subs,
+               AND EXTRACT(MONTH FROM m.created_at) = p_m) as new_subs,
 
             (SELECT NVL(SUM(daily_total), 0)
              FROM (
@@ -316,7 +315,6 @@ CREATE OR REPLACE PROCEDURE proc_new_member_conversion_analysis (p_report_year I
                    AND EXTRACT(MONTH FROM s.from_date) = p_m
                    AND EXTRACT(YEAR FROM m.created_at) = p_y
                    AND EXTRACT(MONTH FROM m.created_at) = p_m
-                   AND sp.status IN (1, 2)
                  GROUP BY m.id, TRUNC(s.from_date)
              )) as subtotal
         FROM DUAL;
