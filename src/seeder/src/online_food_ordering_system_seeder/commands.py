@@ -37,7 +37,7 @@ class Seeder:
             models.Restaurant: self.session.scalars(select(models.Restaurant)).all(),
             models.DeliveryVendor: self.session.scalars(select(models.DeliveryVendor)).all(),
             models.Voucher: self.session.scalars(select(models.Voucher)
-                                                 .options(joinedload(models.Voucher.distributed_to))).all()
+                                                 .options(joinedload(models.Voucher.distributed_to))).unique().all()
         }
 
     def __enter__(self):
@@ -557,7 +557,7 @@ class Seeder:
         for restaurant in tqdm(self.tables[models.Restaurant], desc="Picking restaurants"):
 
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
-            for i, day in enumerate(tqdm(days.sample(fraction=1 / 3).sort(), desc="Seeding vouchers"), start=1):
+            for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Seeding vouchers"), start=1):
                 if random.randint(1, 2) == 1:
                     value = Decimal(f"0.{random.randint(1, 10)}")
                 else:
@@ -571,7 +571,10 @@ class Seeder:
                         use_restaurant = random.randint(1, 4) == 1
                         use_quantity_break = random.randint(1, 5) == 1
 
-                        voucher = make_generic_voucher(f"f{product.name} Flash Sales {i}", f"{value} off any purchases with {product.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
+                        if product is None:
+                            continue
+
+                        voucher = make_generic_voucher(f"{product.name} Flash Sales {i}", f"{value} off any purchases with {product.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
                         price = make_generic_price(voucher, value)
                         price.product = product
                         if use_restaurant:
@@ -602,7 +605,10 @@ class Seeder:
                         ).first()
                         use_restaurant = random.randint(1, 4) == 1
 
-                        voucher = make_generic_voucher(f"f{product_feature.name} Discount {i}", f"{value} off any purchases with {product_feature.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
+                        if product_feature is None:
+                            continue
+
+                        voucher = make_generic_voucher(f"{product_feature.name} Discount {i}", f"{value} off any purchases with {product_feature.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
                         price = make_generic_price(voucher, value)
                         price.product_feature = product_feature
                         if use_restaurant:
