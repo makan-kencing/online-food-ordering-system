@@ -4,8 +4,10 @@ from typing import Sequence
 
 import polars as pl
 from faker import Faker
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session, aliased, contains_eager
+from polars import Decimal
+from sqlalchemy import select
+from sqlalchemy.orm import Session, contains_eager, joinedload
+from sqlalchemy.sql import expression, func, or_
 
 from online_food_ordering_system_seeder import models
 
@@ -22,20 +24,220 @@ class Seeder:
         self.tables: dict[type[T], Sequence[T]] = {
             models.Member: self.session.scalars(select(models.Member)
                                                 .options(contains_eager(models.Member.addresses),
-                                                         contains_eager(models.Member.subscriptions))
+                                                         contains_eager(models.Member.subscriptions),
+                                                         contains_eager(models.Member.orders))
                                                 .join(models.Member.addresses)
-                                                .join(models.Member.subscriptions)).unique().all(),
+                                                .join(models.Member.subscriptions)
+                                                .join(models.Member.orders)).unique().all(),
             models.PaymentMethod: self.session.scalars(select(models.PaymentMethod)).all(),
             models.Membership: self.session.scalars(select(models.Membership)).all(),
             models.Restaurant: self.session.scalars(select(models.Restaurant)).all(),
             models.DeliveryVendor: self.session.scalars(select(models.DeliveryVendor)).all(),
-            models.Voucher: self.session.scalars(select(models.Voucher)).all()
+            models.Voucher: self.session.scalars(select(models.Voucher)
+                                                 .options(contains_eager(models.Voucher.distributed_to))
+                                                 .join(models.Voucher.distributed_to)).all()
         }
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.session.commit()
         self.session.__exit__(exc_type, exc_val, exc_tb)
+
+    @staticmethod
+    def _score(columns: list):
+        expr = columns[0].is_not(expression.Null())
+        for e in columns[1:]:
+            expr += e.is_not(expression.Null())
+        return expr
+
+    def _get_product_price(self, product: models.Product) -> Decimal:
+        stmt = select(models.PriceComponent) \
+            .where(models.PriceComponent.product_id == product.id) \
+            .where(models.PriceComponent.price_type == models.PriceComponent.PriceType.BASE) \
+            .where(models.PriceComponent.product_feature_id.is_(expression.Null())) \
+            .where(models.PriceComponent.product_category_id.is_(expression.Null())) \
+            .where(models.PriceComponent.quantity_break_id.is_(expression.Null())) \
+            .where(models.PriceComponent.order_value_id.is_(expression.Null())) \
+            .where(models.PriceComponent.restaurant_id.is_(expression.Null())) \
+            .where(models.PriceComponent.membership_id.is_(expression.Null())) \
+            .where(models.PriceComponent.voucher_id.is_(expression.Null())) \
+            .where(models.PriceComponent.vendor_id.is_(expression.Null())) \
+            .where(models.PriceComponent.from_date < self.now) \
+            .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now) \
+            .order_by(models.PriceComponent.from_date)
+        price: models.PriceComponent = self.session.scalars(stmt).one()
+        assert price.amount is not None
+        return price.amount
+
+    def _get_product_feature_price(self, product_feature: models.ProductFeature) -> Decimal:
+        stmt = select(models.PriceComponent) \
+            .where(models.PriceComponent.product_feature_id == product_feature.id) \
+            .where(models.PriceComponent.price_type == models.PriceComponent.PriceType.BASE) \
+            .where(models.PriceComponent.product_id.is_(expression.Null())) \
+            .where(models.PriceComponent.product_category_id.is_(expression.Null())) \
+            .where(models.PriceComponent.quantity_break_id.is_(expression.Null())) \
+            .where(models.PriceComponent.order_value_id.is_(expression.Null())) \
+            .where(models.PriceComponent.restaurant_id.is_(expression.Null())) \
+            .where(models.PriceComponent.membership_id.is_(expression.Null())) \
+            .where(models.PriceComponent.voucher_id.is_(expression.Null())) \
+            .where(models.PriceComponent.vendor_id.is_(expression.Null())) \
+            .where(models.PriceComponent.from_date < self.now) \
+            .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now) \
+            .order_by(models.PriceComponent.from_date)
+        price: models.PriceComponent = self.session.scalars(stmt).one()
+        assert price.amount is not None
+        return price.amount
+
+    def _add_order_item_surcharges(self, order_item: models.OrderItem) -> None:
+        prices: Sequence[models.PriceComponent] = self.session.scalars(
+            select(models.PriceComponent)
+            .options(joinedload(models.PriceComponent.quantity_break))
+            .where(or_(
+                models.PriceComponent.product_id == order_item.product.id,
+                models.PriceComponent.product_id.is_(expression.Null())))
+            .where(models.PriceComponent.order_value_id.is_(expression.Null()))
+            .where(models.PriceComponent.vendor_id.is_(expression.Null()))
+            .where(models.PriceComponent.from_date < self.now)
+            .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now)
+        ).all()
+        adjustment_type = models.OrderItemAdjustment.AdjustmentType.SURCHARGE
+        for price in prices:
+            if price.product_category_id is not None:
+                continue
+
+            if price.quantity_break is not None:
+                quantity_break = price.quantity_break
+                if quantity_break.from_quantity > order_item.quantity:
+                    continue
+                if quantity_break.thru_quantity is not None and quantity_break.thru_quantity < order_item.quantity:
+                    continue
+
+            if price.product_id is not None:
+                order = order_item.order
+                if price.restaurant_id is not None:
+                    if order.restaurant_id != price.restaurant_id:
+                        continue
+
+                if price.membership_id is not None:
+                    if order.member is None:
+                        continue
+                    subscription = order.member.get_current_subscription(self.now)
+                    if subscription is None:
+                        continue
+                    if subscription.membership_id != price.membership_id:
+                        continue
+
+            if price.price_type == models.PriceComponent.PriceType.DISCOUNT:
+                adjustment_type = models.OrderItemAdjustment.AdjustmentType.DISCOUNT
+
+            order_item.adjustments.add(models.OrderItemAdjustment(
+                order=order_item.order,
+                order_item=order_item,
+                adjustment_type=adjustment_type,
+                amount=price.amount,
+                percentage=price.percentage
+            ))
+
+    def _add_order_item_feature_surcharge(self, order_item_feature: models.OrderItemFeature) -> None:
+        prices: Sequence[models.PriceComponent] = self.session.scalars(
+            select(models.PriceComponent)
+            .options(joinedload(models.PriceComponent.quantity_break))
+            .where(or_(
+                models.PriceComponent.product_id == order_item_feature.order_item.product.id,
+                models.PriceComponent.product_id.is_(expression.Null())))
+            .where(models.PriceComponent.product_feature_id == order_item_feature.product_feature_id)
+            .where(models.PriceComponent.order_value_id.is_(expression.Null()))
+            .where(models.PriceComponent.vendor_id.is_(expression.Null()))
+            .where(models.PriceComponent.from_date < self.now)
+            .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now)
+        ).all()
+        adjustment_type = models.OrderItemAdjustment.AdjustmentType.SURCHARGE
+        for price in prices:
+            if price.product_category_id is not None:
+                continue
+
+            if price.quantity_break is not None:
+                quantity_break = price.quantity_break
+                if quantity_break.from_quantity > order_item_feature.quantity:
+                    continue
+                if quantity_break.thru_quantity is not None and quantity_break.thru_quantity < order_item_feature.quantity:
+                    continue
+
+            if price.product_id is not None:
+                order = order_item_feature.order_item.order
+                if price.restaurant_id is not None:
+                    if order.restaurant_id != price.restaurant_id:
+                        continue
+
+                if price.membership_id is not None:
+                    if order.member is None:
+                        continue
+                    subscription = order.member.get_current_subscription(self.now)
+                    if subscription is None:
+                        continue
+                    if subscription.membership_id != price.membership_id:
+                        continue
+
+            if price.price_type == models.PriceComponent.PriceType.DISCOUNT:
+                adjustment_type = models.OrderItemAdjustment.AdjustmentType.DISCOUNT
+
+            order_item_feature.order_item.adjustments.add(models.OrderItemAdjustment(
+                order=order_item_feature.order_item.order,
+                order_item=order_item_feature.order_item,
+                adjustment_type=adjustment_type,
+                amount=price.amount,
+                percentage=price.percentage
+            ))
+
+    def _add_order_surcharges(self, order: models.Orders) -> None:
+        prices: Sequence[models.PriceComponent] = self.session.scalars(
+            select(models.PriceComponent)
+            .options(joinedload(models.PriceComponent.order_value))
+            .where(models.PriceComponent.product_id.is_(expression.Null()))
+            .where(models.PriceComponent.product_feature_id.is_(expression.Null()))
+            .where(models.PriceComponent.product_category_id.is_(expression.Null()))
+            .where(models.PriceComponent.quantity_break_id.is_(expression.Null()))
+            .where(models.PriceComponent.from_date < self.now)
+            .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now)
+        ).all()
+        adjustment_type = models.OrderItemAdjustment.AdjustmentType.SURCHARGE
+        for price in prices:
+            if price.order_value is not None:
+                order_value = price.order_value
+                subtotal = order.subtotal
+                if order_value.from_amount > subtotal:
+                    continue
+                if order_value.thru_amount is not None and order_value.thru_amount < subtotal:
+                    continue
+
+            if price.restaurant_id is not None:
+                if order.restaurant_id != price.restaurant_id:
+                    continue
+
+            if price.membership_id is not None:
+                if order.member is None:
+                    continue
+                subscription = order.member.get_current_subscription(self.now)
+                if subscription is None:
+                    continue
+                if subscription.membership_id != price.membership_id:
+                    continue
+
+            if price.vendor_id is not None:
+                if order.delivery is None:
+                    continue
+                if order.delivery.vendor_id != price.vendor_id:
+                    continue
+
+            if price.price_type == models.PriceComponent.PriceType.DISCOUNT:
+                adjustment_type = models.OrderItemAdjustment.AdjustmentType.DISCOUNT
+
+            order.adjustments.add(models.OrderItemAdjustment(
+                order=order,
+                adjustment_type=adjustment_type,
+                amount=price.amount,
+                percentage=price.percentage
+            ))
 
     def _create_order(self, member: models.Member, restaurant: models.Restaurant,
                       order_time: datetime) -> models.Orders:
@@ -59,30 +261,20 @@ class Seeder:
 
         vouchers: list[models.VoucherDistribution] = []
 
-        product_priced_alias = aliased(models.PriceComponent)
-        product_feature_priced_alias = aliased(models.PriceComponent)
         stmt = select(models.MenuItem) \
-            .options(contains_eager(models.MenuItem.product)
-                     .contains_eager(models.Product.priced, product_priced_alias),
+            .options(contains_eager(models.MenuItem.product),
                      contains_eager(models.MenuItem.product)
                      .contains_eager(models.Product.attributes)
                      .contains_eager(models.ProductAttribute.product_feature_group)
                      .contains_eager(models.ProductFeatureGroup.fields)
-                     .contains_eager(models.ProductFeatureGroupField.product_feature)
-                     .contains_eager(models.ProductFeature.priced, product_feature_priced_alias)) \
+                     .contains_eager(models.ProductFeatureGroupField.product_feature)) \
             .where(models.MenuItem.restaurant_id == restaurant.id) \
             .join(models.MenuItem.product) \
             .where(order_time > models.Product.introduction_date) \
-            .join(product_priced_alias, models.Product.priced) \
-            .where(product_priced_alias.from_date >= order_time) \
-            .where(order_time < func.coalesce(product_priced_alias.from_date, func.current_timestamp())) \
             .join(models.Product.attributes) \
             .join(models.ProductAttribute.product_feature_group) \
             .join(models.ProductFeatureGroup.fields) \
-            .join(models.ProductFeatureGroupField.product_feature) \
-            .join(product_feature_priced_alias, models.ProductFeature.priced) \
-            .where(product_feature_priced_alias.from_date >= order_time) \
-            .where(order_time < func.coalesce(product_feature_priced_alias.from_date, func.current_timestamp()))
+            .join(models.ProductFeatureGroupField.product_feature)
         menu_items = self.session.scalars(stmt).all()
         for menu_item in random.choices(menu_items, k=random.randint(1, len(menu_items) // 3)):
             product = menu_item.product
@@ -90,10 +282,12 @@ class Seeder:
 
             order_item = models.OrderItem(
                 order=order,
-                product_id=product.id,
+                product=product,
                 quantity=quantity,
-                unit_price=product.base_price.amount
+                unit_price=self._get_product_price(product)
             )
+            order.items.add(order_item)
+            self._add_order_item_surcharges(order_item)
 
             for attribute in product.attributes:
                 attribute: models.ProductAttribute
@@ -109,15 +303,15 @@ class Seeder:
                     product_feature = field.product_feature
 
                     order_item_feature = models.OrderItemFeature(
-                        product_feature_id=product_feature.id,
+                        product_feature=product_feature,
                         order_item=order_item,
                         quantity=quantity,
-                        unit_price=product_feature.base_price.amount
+                        unit_price=self._get_product_feature_price(product_feature)
                     )
                     order_item.features.add(order_item_feature)
+                    self._add_order_item_feature_surcharge(order_item_feature)
 
-            order.items.add(order_item)
-
+        self._add_order_surcharges(order)
         total = order.subtotal
 
         payment = models.Payment(

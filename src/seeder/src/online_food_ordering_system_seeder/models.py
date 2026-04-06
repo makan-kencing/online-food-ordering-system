@@ -98,6 +98,16 @@ class Member(Base, HasId):
     created_price_components: Mapped[set[PriceComponent]] = relationship(back_populates="created_by")
     created_vouchers: Mapped[set[Voucher]] = relationship(back_populates="created_by")
 
+    def get_current_subscription(self, now: datetime) -> MonthlySubscription | None:
+        for subscription in self.subscriptions:
+            if subscription.from_date > now:
+                continue
+            if subscription.thru_date is not None and subscription.thru_date < now:
+                continue
+
+            return subscription
+        return None
+
 
 class Membership(Base, HasId, HasNameAndDescription):
     __tablename__ = "membership"
