@@ -1,10 +1,10 @@
 import random
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Sequence
 
 import polars as pl
 from faker import Faker
-from polars import Decimal
 from sqlalchemy import select, literal, ColumnElement
 from sqlalchemy.orm import Session, contains_eager, joinedload
 from sqlalchemy.sql import expression, func, or_, and_
@@ -17,15 +17,15 @@ def if_then(p, *q) -> ColumnElement[bool]:
 
 
 class Seeder:
-    def __init__(self, session: Session):
+    def __init__[T](self, session: Session):
         self.session = session
         self.faker = Faker()
 
         self.now = datetime.now()
+        self.tables: dict[type[T], Sequence[T]] = {}
 
-    def __enter__[T](self):
-        self.session.__enter__()
-        self.tables: dict[type[T], Sequence[T]] = {
+    def refresh_cache(self) -> None:
+        self.tables = {
             models.Member: self.session.scalars(select(models.Member)
                                                 .options(joinedload(models.Member.addresses),
                                                          joinedload(models.Member.subscriptions),
@@ -38,6 +38,10 @@ class Seeder:
             models.Voucher: self.session.scalars(select(models.Voucher)
                                                  .options(joinedload(models.Voucher.distributed_to))).all()
         }
+
+    def __enter__(self):
+        self.session.__enter__()
+        self.refresh_cache()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -520,6 +524,95 @@ class Seeder:
         self.session.commit()
 
     def seed_vouchers(self) -> None:
+        def distribute_randomly(voucher: models.Voucher) -> None:
+            for member in random.choices(self.tables[models.Member], k=voucher.usage_limit + random.randint(-100, 100)):
+                voucher.distributed_to.add(models.VoucherDistribution(
+                    member=member,
+                    voucher=voucher
+                ))
+
+        def make_generic_voucher(name, description, created_by_id) -> models.Voucher:
+            return models.Voucher(
+                name=name,
+                description=description,
+                usage_limit=random.randint(100, 500),
+                from_date=day,
+                thru_date=day + timedelta(days=random.randint(10, 31)),
+                created_by_id=created_by_id
+            )
+
+        def make_generic_price(voucher: models.Voucher, value: Decimal) -> models.PriceComponent:
+            return models.PriceComponent(
+                price_type=models.PriceComponent.PriceType.DISCOUNT,
+                voucher=voucher,
+                description=voucher.description,
+                from_date=voucher.from_date,
+                thru_date=voucher.thru_date,
+                amount=value if value >= 1 else None,
+                percentage=value if value < 1 else None,
+                created_by_id=voucher.created_by_id
+            )
+
+        for restaurant in self.tables[models.Restaurant]:
+            days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
+            for i, day in enumerate(days.sample(fraction=1 / 3).sort(), start=1):
+                if random.randint(1, 2) == 1:
+                    value = Decimal(f"0.{random.randint(1, 10)}")
+                else:
+                    value = Decimal(random.choice((5, 10, 25)))
+                match random.randint(1, 7):
+                    case 1 | 2 | 3:
+                        product = self.session.scalars(
+                            select(models.Product)
+                            .where(models.Product.created_by_id == restaurant.created_by_id)
+                        ).one()
+                        use_restaurant = random.randint(1, 4) == 1
+                        use_quantity_break = random.randint(1, 5) == 1
+
+                        voucher = make_generic_voucher(f"f{product.name} Flash Sales {i}", f"{value} off any purchases with {product.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
+                        price = make_generic_price(voucher, value)
+                        price.product = product
+                        if use_restaurant:
+                            price.restaurant = restaurant
+                        if use_quantity_break:
+                            from_quantity = random.randint(2, 4)
+                            price.quantity_break = models.QuantityBreak(
+                                from_quantity=from_quantity
+                            )
+                    case 4:
+                        voucher = make_generic_voucher(f"{restaurant.name} Offer {i}", f"{value} off shopping in {restaurant.name}", restaurant.created_by_id)
+                        price = make_generic_price(voucher, value)
+                        price.restaurant = restaurant
+                    case 5:
+                        from_amount = Decimal(random.randint(20, 80))
+                        use_restaurant = random.randint(1, 4) == 1
+                        voucher = make_generic_voucher(f"Mass Purchase Sale {i}", f"{value} off any purchases with more than ${from_amount}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
+                        price = make_generic_price(voucher, value)
+                        price.order_value = models.OrderValue(
+                            from_amount=from_amount
+                        )
+                        if use_restaurant:
+                            price.restaurant = restaurant
+                    case _:
+                        product_feature = self.session.scalars(
+                            select(models.ProductFeature)
+                            .where(models.ProductFeature.created_by_id == restaurant.created_by_id)
+                        ).one()
+                        use_restaurant = random.randint(1, 4) == 1
+
+                        voucher = make_generic_voucher(f"f{product_feature.name} Discount {i}", f"{value} off any purchases with {product_feature.name}" + (f" in {restaurant.name}" if use_restaurant else ""), restaurant.created_by_id)
+                        price = make_generic_price(voucher, value)
+                        price.product_feature = product_feature
+                        if use_restaurant:
+                            price.restaurant = restaurant
+
+                voucher.priced.add(price)  # noqa
+                distribute_randomly(voucher)
+                self.session.add(voucher)
+
+        self.session.commit()
+
+    def seed_voucher_distributions(self) -> None:
         members = self.tables[models.Member]
         for voucher in self.tables[models.Voucher]:
             for member in random.choices(members, k=len(members) // 10):
