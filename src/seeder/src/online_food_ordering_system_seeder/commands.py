@@ -23,19 +23,15 @@ class Seeder:
         self.session.__enter__()
         self.tables: dict[type[T], Sequence[T]] = {
             models.Member: self.session.scalars(select(models.Member)
-                                                .options(contains_eager(models.Member.addresses),
-                                                         contains_eager(models.Member.subscriptions),
-                                                         contains_eager(models.Member.orders))
-                                                .join(models.Member.addresses)
-                                                .join(models.Member.subscriptions)
-                                                .join(models.Member.orders)).unique().all(),
+                                                .options(joinedload(models.Member.addresses),
+                                                         joinedload(models.Member.subscriptions),
+                                                         joinedload(models.Member.orders))).unique().all(),
             models.PaymentMethod: self.session.scalars(select(models.PaymentMethod)).all(),
             models.Membership: self.session.scalars(select(models.Membership)).all(),
             models.Restaurant: self.session.scalars(select(models.Restaurant)).all(),
             models.DeliveryVendor: self.session.scalars(select(models.DeliveryVendor)).all(),
             models.Voucher: self.session.scalars(select(models.Voucher)
-                                                 .options(contains_eager(models.Voucher.distributed_to))
-                                                 .join(models.Voucher.distributed_to)).all()
+                                                 .options(joinedload(models.Voucher.distributed_to))).all()
         }
         return self
 
