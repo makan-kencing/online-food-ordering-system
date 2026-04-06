@@ -12,19 +12,22 @@ DELETE FROM restaurant;
 COMMIT;
 
 -- 1. RESTAURANT
-INSERT INTO RESTAURANT (NAME, CODE, DESCRIPTION, OPENING_HOUR, CLOSING_HOUR, IS_TEMPORARILY_CLOSED, ADDRESS_ID, CREATED_BY_ID) VALUES
-                                                                                                                                   ('Pizza Palace Downtown', 'R1', 'Best pizza in town', INTERVAL '10' HOUR, INTERVAL '22' HOUR, FALSE, 1, 1),
-                                                                                                                                   ('Burger King Express', 'R2', 'Fast and delicious burgers', INTERVAL '9' HOUR, INTERVAL '23' HOUR, FALSE, 2, 2),
-                                                                                                                                   ('Healthy Bites Cafe', 'R3', 'Organic and healthy options', INTERVAL '8' HOUR, INTERVAL '20' HOUR, FALSE, 3, 3),
-                                                                                                                                   ('Tasty Corner', 'R4', 'Affordable family meals', INTERVAL '11' HOUR, INTERVAL '21' HOUR, FALSE, 4, 4),
-                                                                                                                                   ('Pizza Hut Express', 'R5', 'Famous pan pizzas', INTERVAL '10:30' HOUR TO MINUTE, INTERVAL '22:30' HOUR TO MINUTE, FALSE, 5, 5),
-                                                                                                                                   ('Sweet Treats Dessert', 'R6', 'Delicious desserts', INTERVAL '12' HOUR, INTERVAL '22' HOUR, FALSE, 6, 6),
-                                                                                                                                   ('Healthy Pizza Co', 'R7', 'Gluten free pizza', INTERVAL '10' HOUR, INTERVAL '21' HOUR, FALSE, 7, 7),
-                                                                                                                                   ('Coffee Corner', 'R8', 'Premium coffee', INTERVAL '7' HOUR, INTERVAL '20' HOUR, FALSE, 8, 8),
-                                                                                                                                   ('Classic Pizza House', 'R9', 'Traditional pizza', INTERVAL '11' HOUR, INTERVAL '23' HOUR, FALSE, 9, 9),
-                                                                                                                                   ('Tea House', 'R10', 'Fine tea selection', INTERVAL '9' HOUR, INTERVAL '19' HOUR, FALSE, 10, 10),
-                                                                                                                                   ('Noodle King', 'R11', 'Handmade noodles', INTERVAL '10' HOUR, INTERVAL '22' HOUR, FALSE, 11, 11),
-                                                                                                                                   ('Sushi Master', 'R12', 'Fresh Japanese', INTERVAL '11:30' HOUR TO MINUTE, INTERVAL '21:30' HOUR TO MINUTE, FALSE, 12, 12);
+INSERT INTO RESTAURANT (NAME, CODE, INTRODUCTION_DATE, DESCRIPTION, OPENING_HOUR, CLOSING_HOUR, IS_TEMPORARILY_CLOSED, ADDRESS_ID,
+                        CREATED_BY_ID)
+VALUES ('Pizza Palace Downtown', 'R1', TIMESTAMP '2025-01-01 0:0:0', 'Best pizza in town', INTERVAL '10' HOUR, INTERVAL '22' HOUR, FALSE, 1, 2),
+       ('Burger King Express', 'R2', TIMESTAMP '2025-02-03 0:0:0', 'Fast and delicious burgers', INTERVAL '9' HOUR, INTERVAL '23' HOUR, FALSE, 2, 3),
+       ('Healthy Bites Cafe', 'R3', TIMESTAMP '2025-06-02 0:0:0', 'Organic and healthy options', INTERVAL '8' HOUR, INTERVAL '20' HOUR, FALSE, 3, 4),
+       ('Tasty Corner', 'R4', TIMESTAMP '2025-03-01 0:0:0', 'Affordable family meals', INTERVAL '11' HOUR, INTERVAL '21' HOUR, FALSE, 4, 5),
+       ('Pizza Hut Express', 'R5', TIMESTAMP '2025-08-01 0:0:0', 'Famous pan pizzas', INTERVAL '10:30' HOUR TO MINUTE,
+        INTERVAL '22:30' HOUR TO MINUTE, FALSE, 5, 6),
+       ('Sweet Treats Dessert', 'R6', TIMESTAMP '2025-01-12 0:0:0', 'Delicious desserts', INTERVAL '12' HOUR, INTERVAL '22' HOUR, FALSE, 6, 7),
+       ('Healthy Pizza Co', 'R7', TIMESTAMP '2025-02-23 0:0:0', 'Gluten free pizza', INTERVAL '10' HOUR, INTERVAL '21' HOUR, FALSE, 7, 8),
+       ('Coffee Corner', 'R8', TIMESTAMP '2025-01-22 0:0:0', 'Premium coffee', INTERVAL '7' HOUR, INTERVAL '20' HOUR, FALSE, 8, 9),
+       ('Classic Pizza House', 'R9', TIMESTAMP '2025-01-16 0:0:0', 'Traditional pizza', INTERVAL '11' HOUR, INTERVAL '23' HOUR, FALSE, 9, 10),
+       ('Tea House', 'R10', TIMESTAMP '2026-01-03 0:0:0', 'Fine tea selection', INTERVAL '9' HOUR, INTERVAL '19' HOUR, FALSE, 10, 11),
+       ('Noodle King', 'R11', TIMESTAMP '2025-11-04 0:0:0', 'Handmade noodles', INTERVAL '10' HOUR, INTERVAL '22' HOUR, FALSE, 11, 12),
+       ('Sushi Master', 'R12', TIMESTAMP '2025-09-07 0:0:0', 'Fresh Japanese', INTERVAL '11:30' HOUR TO MINUTE, INTERVAL '21:30' HOUR TO MINUTE,
+        FALSE, 12, 13);
 
 -- 2. MENU_ITEM_GROUP
 INSERT INTO MENU_ITEM_GROUP (NAME, DESCRIPTION) VALUES
