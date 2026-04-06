@@ -8,6 +8,7 @@ from faker import Faker
 from sqlalchemy import select, literal, ColumnElement
 from sqlalchemy.orm import Session, contains_eager, joinedload
 from sqlalchemy.sql import expression, func, or_, and_
+from tqdm import tqdm
 
 from online_food_ordering_system_seeder import models
 
@@ -553,9 +554,10 @@ class Seeder:
                 created_by_id=voucher.created_by_id
             )
 
-        for restaurant in self.tables[models.Restaurant]:
+        for restaurant in tqdm(self.tables[models.Restaurant], desc="Picking restaurants"):
+
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
-            for i, day in enumerate(days.sample(fraction=1 / 3).sort(), start=1):
+            for i, day in enumerate(tqdm(days.sample(fraction=1 / 3).sort(), desc="Seeding vouchers"), start=1):
                 if random.randint(1, 2) == 1:
                     value = Decimal(f"0.{random.randint(1, 10)}")
                 else:
