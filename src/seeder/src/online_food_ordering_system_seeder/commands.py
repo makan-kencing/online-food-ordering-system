@@ -253,7 +253,7 @@ class Seeder:
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, is_outer=True)
-        ).one_or_none()
+        ).first()
 
         if price is None:
             return None
@@ -305,7 +305,7 @@ class Seeder:
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, is_outer=True)
-        ).one_or_none()
+        ).first()
 
         if price is None:
             return None
@@ -358,7 +358,7 @@ class Seeder:
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.order_value, is_outer=True)
-        ).one_or_none()
+        ).unique().first()
 
         if price is None:
             return None
@@ -416,7 +416,7 @@ class Seeder:
             .join(models.ProductAttribute.product_feature_group) \
             .join(models.ProductFeatureGroup.fields) \
             .join(models.ProductFeatureGroupField.product_feature)
-        menu_items = self.session.scalars(stmt).all()
+        menu_items = self.session.scalars(stmt).unique().all()
         for menu_item in random.choices(menu_items, k=random.randint(1, len(menu_items) // 3)):
             product = menu_item.product
             quantity = random.randint(1, 3)
@@ -557,7 +557,7 @@ class Seeder:
         for restaurant in tqdm(self.tables[models.Restaurant], desc="Picking restaurants"):
 
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
-            for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Seeding vouchers"), start=1):
+            for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Creating vouchers"), start=1):
                 if random.randint(1, 2) == 1:
                     value = Decimal(f"0.{random.randint(1, 10)}")
                 else:
@@ -621,13 +621,13 @@ class Seeder:
         self.session.commit()
 
     def seed_orders(self) -> None:
-        for member in self.tables[models.Member]:
+        for member in tqdm(self.tables[models.Member], desc="Picking members"):
             days = pl.date_range(start=member.created_at, end=self.now, interval="1d", eager=True)
-            for day in days.sample(fraction=1 / 3).sort():
+            for day in tqdm(days.sample(fraction=1 / 3).sort(), desc="Creating order"):
                 restaurant = random.choice(self.tables[models.Restaurant])
                 day = self.faker.date_time_between(
-                    start_date=day.replace(hour=0, minute=0, second=0) + restaurant.opening_hour,
-                    end_date=day.replace(hour=0, minute=0, second=0) + restaurant.closing_hour,
+                    start_date=datetime.combine(day, (datetime.min + restaurant.opening_hour).time()),
+                    end_date=datetime.combine(day, (datetime.min + restaurant.closing_hour).time()),
                 )
 
                 orders = self._create_order(member, restaurant, day)
