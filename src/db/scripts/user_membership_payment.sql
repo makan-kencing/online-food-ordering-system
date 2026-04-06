@@ -133,26 +133,26 @@ END;
 --EXEC proc_subscribe_member(61,2, 98.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
-CREATE OR REPLACE PROCEDURE proc_upgrade_membership (
-    p_member_id      IN member.id%TYPE,
-    p_new_membership IN NUMBER,
-    p_pay_amount     IN NUMBER,
-    p_pay_method_id  IN NUMBER
+
+
+create or replace procedure proc_upgrade_current_membership(
+    v_member_id IN MEMBER.ID%type,
+    v_upgrade_membership_id IN MEMBERSHIP.ID%type,
+    v_paid_amount IN PAYMENT.AMOUNT%type,
+    v_payment_method_id IN PAYMENT_METHOD.ID%type
 ) AS
-    v_current_price   NUMBER;
-    v_target_price    NUMBER;
-    v_price_diff      NUMBER;
-    v_current_sub_id  NUMBER;
-    v_current_expiry  DATE;
-    v_payment_id      NUMBER;
-    v_new_sub_id      NUMBER;
+    v_old_membership_id MEMBERSHIP.ID%type;
+    v_old_membership_value MEMBERSHIP.PRICE%type;
+    v_new_membership_value MEMBERSHIP.PRICE%type;
+
+    v_payment_id PAYMENT.ID%type;
 BEGIN
     BEGIN
-        SELECT s.id, s.thru_date, m.price
-        INTO v_current_sub_id, v_current_expiry, v_current_price
+        SELECT s.id, m.price
+        INTO v_old_membership_id, v_old_membership_value
         FROM monthly_subscription s
         JOIN membership m ON s.membership_id = m.id
-        WHERE s.member_id = p_member_id
+        WHERE s.member_id = v_member_id
           AND CURRENT_TIMESTAMP BETWEEN s.from_date AND s.thru_date
           AND ROWNUM = 1;
     EXCEPTION
@@ -161,55 +161,41 @@ BEGIN
     END;
 
     BEGIN
-        SELECT price INTO v_target_price
+        SELECT price INTO v_new_membership_value
         FROM membership
-        WHERE id = p_new_membership;
+        WHERE id = v_upgrade_membership_id;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
             RAISE_APPLICATION_ERROR(-20031, 'Error: Target membership level does not exist.');
     END;
 
-    v_price_diff := v_target_price - v_current_price;
-
-    IF v_price_diff <= 0 THEN
+    IF v_new_membership_value - v_old_membership_value <= 0 THEN
         RAISE_APPLICATION_ERROR(-20033, 'Error: Target level must be higher than current level.');
     END IF;
 
-    IF p_pay_amount != v_price_diff THEN
+    IF v_paid_amount != v_new_membership_value - v_old_membership_value THEN
         RAISE_APPLICATION_ERROR(-20032,
-            'Error: Incorrect top-up amount. Expected difference: ' || v_price_diff ||
-            ' (Target ' || v_target_price || ' - Current ' || v_current_price || ')');
+            'Error: Incorrect top-up amount. Expected difference: ' || v_new_membership_value - v_old_membership_value ||
+            ' (Target ' || v_new_membership_value || ' - Current ' || v_old_membership_value || ')');
     END IF;
 
     INSERT INTO payment (amount, payment_method_id, ref_no, payment_method_data)
     VALUES (
-        p_pay_amount,
-        p_pay_method_id,
-        'UPGR-DIFF-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || p_member_id,
-        '{"action": "UPGRADE_TOPUP", "from_price": ' || v_current_price || ', "to_price": ' || v_target_price || '}'
+        v_paid_amount,
+        v_payment_method_id,
+        'UPGR-DIFF-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || v_member_id,
+        '{"action": "UPGRADE_TOPUP", "from_price": ' || v_old_membership_value || ', "to_price": ' || v_new_membership_value || '}'
     )
     RETURNING id INTO v_payment_id;
 
-    INSERT INTO monthly_subscription (
-        membership_id, member_id, from_date, thru_date
-    ) VALUES (
-        p_new_membership, p_member_id, CURRENT_TIMESTAMP, v_current_expiry
-    )
-    RETURNING id INTO v_new_sub_id;
+    INSERT INTO SUBSCRIPTION_PAYMENT(monthly_subscription_id, payment_id, status)
+    VALUES (v_payment_id, v_old_membership_id, 1);
 
-    INSERT INTO subscription_payment (
-        payment_id,
-        monthly_subscription_id,
-        status
-    ) VALUES (
-        v_payment_id,
-        v_new_sub_id,
-        2
-    );
+    UPDATE MONTHLY_SUBSCRIPTION
+    SET MEMBERSHIP_ID = v_upgrade_membership_id
+    WHERE MEMBERSHIP_ID = v_old_membership_id;
 
-    COMMIT;
-    DBMS_OUTPUT.PUT_LINE('Top-up Success! Paid RM ' || p_pay_amount || ' to upgrade to level ' || p_new_membership);
-
+    DBMS_OUTPUT.PUT_LINE('Top-up Success! Paid RM ' || v_paid_amount || ' to upgrade to level ' || v_upgrade_membership_id);
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
