@@ -63,7 +63,7 @@ SELECT * FROM vw_product_category_hierarchy;
 
 -- ========================================
 -- PROCEDURE 1: ADD SINGLE FEATURE TO EXISTING PRODUCT
--- Adds a single feature to an existing product (does NOT create product)
+-- Adds a single feature to an existing product
 -- ========================================
 CREATE OR REPLACE PROCEDURE add_feature_to_product(
     p_product_code IN VARCHAR2,
@@ -604,27 +604,21 @@ END;
 -- ========================================
 -- USAGE EXAMPLES
 -- ========================================
-
--- 1. VIEWS
 SELECT * FROM vw_product_feature_hierarchy;
 SELECT * FROM vw_product_feature_hierarchy WHERE product_code = 'PIZ-MRG-1';
 SELECT * FROM vw_product_category_hierarchy;
 
--- 2. CREATE NEW PRODUCT
 -- EXEC setup_product(
 --             'PIZ-DELUX-1',
 --             'Deluxe Pizza',
 --             'Our signature deluxe pizza',
 --             'Size:Regular,Large,Personal|Crust:Thin,Pan,Stuffed|Spice:Mild,Medium,Hot'
 --     );
--- 3. ADD FEATURE TO EXISTING PRODUCT
+
 -- EXEC add_feature_to_product('PIZ-MRG-1', 'Extra Cheese', 'TOP_EXCHZ', 'Toppings');
 
--- 4. ADD FEATURE GROUP TO EXISTING PRODUCT
 -- EXEC add_feature_group_to_product('PIZ-MRG-1', 'Premium Toppings', 'Extra Cheese,Extra Pepperoni,Extra Mushroom');
 
-
--- 5. RUN REPORTS
 -- EXEC feature_usage_report;                    -- Default (10 items, page 1)
 -- EXEC feature_usage_report(5, 1);              -- 5 items per page, page 1
 -- EXEC feature_usage_report(5, 2);              -- 5 items per page, page 2
