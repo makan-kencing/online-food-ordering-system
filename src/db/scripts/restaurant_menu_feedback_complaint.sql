@@ -92,13 +92,6 @@ END;
 -- EXEC proc_add_menu_item('Ice Cream Sundae', 'Pizzas', 3);
 -- COMMIT;
 
-/*BEGIN
-    proc_add_menu_item('Ice Cream Sundae', 
-                       'Pizzas', 
-                       3);
-END;
-/*/
-
 -- Procedure - 2
 -- Add order item feedback (image)
 CREATE OR REPLACE PROCEDURE proc_add_feedback_image (
@@ -150,31 +143,10 @@ EXCEPTION
 END;
 /
 
-/*BEGIN
-    proc_add_feedback_image(1, 'test.png');
-end;
-/
-commit;*/
+-- EXEC proc_add_feedback_image(1, 'test.png');
+commit;
 
 -- Trigger - 1
--- Ensure each order items has zero or one feedback rating
-CREATE OR REPLACE TRIGGER trg_one_feedback_per_order_item
-    BEFORE INSERT ON feedback
-    FOR EACH ROW
-DECLARE
-    v_count NUMBER;
-BEGIN
-    SELECT COUNT(*) INTO v_count
-    FROM feedback
-    WHERE order_item_id = :NEW.order_item_id;
-
-    IF v_count > 0 THEN
-        RAISE_APPLICATION_ERROR(-20040, 'Only one feedback is allowed per order item.');
-    END IF;
-END;
-/
-
--- Trigger - 2
 -- Ensure each feedback only has a limit of 3 feedback images
 CREATE OR REPLACE TRIGGER trg_feedback_image_limit
     BEFORE INSERT ON feedback_image
@@ -191,6 +163,8 @@ BEGIN
     END IF;
 END;
 /
+
+commit;
 
 --Report - 1 
 --Each restaurant menu with menu item data
@@ -270,7 +244,7 @@ BEGIN
             END LOOP;
             CLOSE cur_items;
 
-            DBMS_OUTPUT.PUT_LINE('‎ ‎ ‎ ‎ ‎ '); -- this is invisible character cuz some reason putting " " doesn't print a blank line for me
+            DBMS_OUTPUT.PUT_LINE('‎ ‎ ‎ ‎ ‎ '); -- this is invisible character because some reason putting " " doesn't print a blank line for me
         END LOOP;
         CLOSE cur_groups;
 
@@ -287,12 +261,15 @@ END;
 
 commit;
 
+-- EXEC proc_menu_detailed_report;      //display all
+-- EXEC proc_menu_detailed_report(1);   //display specific restaurant
+
 -- Report - 2
 -- Product feedback detailed report, can choose to display all product or display specific product
 CREATE OR REPLACE PROCEDURE proc_feedback_by_product (
     p_product_id IN NUMBER DEFAULT NULL
 ) IS
-    v_line_width CONSTANT NUMBER := 120;  -- increased for wider report
+    v_line_width CONSTANT NUMBER := 120;  
     v_feedback_count NUMBER;
     v_product_exists NUMBER;
 
@@ -321,6 +298,15 @@ BEGIN
         IF v_product_exists = 0 THEN
             RAISE_APPLICATION_ERROR(-20001, 'Product not found for ID ' || p_product_id);
         END IF;
+
+        SELECT COUNT(*) INTO v_feedback_count
+        FROM feedback f
+                 JOIN order_item oi ON f.order_item_id = oi.id
+        WHERE oi.product_id = p_product_id;
+
+        IF v_feedback_count = 0 THEN
+            RAISE_APPLICATION_ERROR(-20002, 'No feedback found for product ID ' || p_product_id);
+        END IF;
     END IF;
 
     -- Header
@@ -329,7 +315,7 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 
     DBMS_OUTPUT.PUT_LINE(
-            RPAD('ITEM NAME', 40) ||  -- increased from 20 to 40
+            RPAD('ITEM NAME', 40) ||  
             RPAD('RATING', 10) ||
             RPAD('REMARKS', 50) ||
             RPAD('STATUS', 20)
@@ -359,7 +345,7 @@ BEGIN
 
             IF v_first_row THEN
                 DBMS_OUTPUT.PUT_LINE(
-                        RPAD(rec_product.name, 40) ||  -- match header
+                        RPAD(rec_product.name, 40) ||  
                         RPAD(rec_feedback.rating, 10) ||
                         RPAD(NVL(rec_feedback.content, 'N/A'), 50) ||
                         RPAD(rec_feedback.status, 20)
@@ -390,6 +376,10 @@ BEGIN
 END;
 /
 
+-- EXEC proc_feedback_by_product;      //display all product with feedback
+-- EXEC proc_feedback_by_product(5);   //display specific product
+-- EXEC proc_feedback_by_product(1);   //product with no feedback
+
 commit;
 -- =========================
 -- Extra: index - 1
@@ -400,40 +390,3 @@ CREATE INDEX idx_menu_item_restaurant_id ON menu_item(restaurant_id);
 -- Create index from feedback to order_item
 CREATE INDEX idx_feedback_order_item ON feedback(order_item_id);
 
-
---Testing for trigger 1
-/*
-CREATE OR REPLACE PROCEDURE proc_add_order_item_feedback(
-    p_order_item_id IN INT,
-    p_rating        IN INT,
-    p_content       IN VARCHAR2
-)
-AS
-    v_exists NUMBER;
-BEGIN
-    SELECT COUNT(*) INTO v_exists
-    FROM order_item
-    WHERE id = p_order_item_id;
-
-    IF v_exists = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Order Item ID does not exist.');
-    END IF;
-
-    IF p_rating < 1 OR p_rating > 10 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'Rating must be between 1 and 10.');
-    END IF;
-
-    INSERT INTO feedback(order_item_id, rating, content)
-    VALUES (p_order_item_id, p_rating, p_content);
-
-    COMMIT;
-
-    DBMS_OUTPUT.PUT_LINE('Feedback added successfully for Order Item ID: ' || p_order_item_id);
-END;
-/
-
-BEGIN
-    proc_add_order_item_feedback(6, '', 'This product is great!');
-end;
-/
-COMMIT;*/
