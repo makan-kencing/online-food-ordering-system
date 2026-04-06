@@ -5,7 +5,7 @@ import factory.fuzzy
 
 from online_food_ordering_system_seeder import models, common
 
-START_DATE = datetime(2026, 1, 1)
+START_DATE = datetime(2025, 1, 1)
 
 
 class Base(factory.alchemy.SQLAlchemyModelFactory):
@@ -22,13 +22,14 @@ class AddressFactory(Base):
 class MemberFactory(Base):
     class Meta:
         model = models.Member
-        exclude = ("profile", "address_s")
+        exclude = ("i", "profile", "address_s")
 
+    i = factory.Sequence(lambda n: n)
     profile = factory.Faker("profile")
     address_s = factory.LazyAttribute(lambda o: o.profile["address"].replace("\n", ", "))
 
-    username = factory.LazyAttribute(lambda o: o.profile["username"])
-    email = factory.LazyAttribute(lambda o: o.profile["mail"])
+    username = factory.LazyAttribute(lambda o: o.profile["username"] + str(o.i))
+    email = factory.LazyAttribute(lambda o: o.profile["mail"].replace("@", f"{o.i}@"))
     created_at = factory.fuzzy.FuzzyNaiveDateTime(start_dt=START_DATE)
 
 

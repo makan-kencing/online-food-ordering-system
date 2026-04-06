@@ -13,8 +13,8 @@ CREATE TABLE price_component
     from_date           TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     thru_date           TIMESTAMP,
     description         VARCHAR(200)                        NOT NULL,
-    amount              DECIMAL CHECK ( amount > 0 ),
-    percentage          DECIMAL(5, 4) CHECK ( percentage > 0 AND percentage < 1 ),
+    amount              DECIMAL CHECK ( amount is not null or amount > 0 ),
+    percentage          DECIMAL(5, 4) CHECK ( percentage is not null or percentage > 0 AND percentage < 1 ),
     product_id          INT REFERENCES product (id),
     product_feature_id  INT REFERENCES product_feature (id),
     product_category_id INT REFERENCES product_category (id),
@@ -25,7 +25,7 @@ CREATE TABLE price_component
     voucher_id          INT REFERENCES voucher (id),
     vendor_id           INT REFERENCES delivery_vendor (id),
     created_by_id       INT REFERENCES member (id)          NOT NULL,
-    CHECK ( amount IS NULL != percentage IS NULL ),                       -- mutual exclusion
+    CHECK ( (amount IS NULL) != (percentage IS NULL) ),                       -- mutual exclusion
     CHECK ( thru_date is null or thru_date > from_date ),
     CHECK ( coalesce(product_id, product_feature_id, product_category_id, -- at least one condition
                      quantity_break_id, order_value_id, restaurant_id,

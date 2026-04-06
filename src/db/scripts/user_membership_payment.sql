@@ -363,7 +363,6 @@ BEGIN
               AND EXTRACT(MONTH FROM s.from_date) = v_month_id
               AND EXTRACT(YEAR FROM m.created_at) = v_year
               AND EXTRACT(MONTH FROM m.created_at) < v_month_id
-              AND sp.status IN (1, 2)
             GROUP BY m.id, TRUNC(s.from_date)
         );
 
