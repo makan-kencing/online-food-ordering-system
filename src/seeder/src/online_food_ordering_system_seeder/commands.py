@@ -11,6 +11,7 @@ from sqlalchemy.sql import expression, func, or_, and_
 from tqdm import tqdm
 
 from online_food_ordering_system_seeder import models
+from online_food_ordering_system_seeder.models import Product
 
 
 def if_then(p, *q) -> ColumnElement[bool]:
@@ -71,8 +72,8 @@ class Seeder:
             .where(models.PriceComponent.from_date < self.now) \
             .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now) \
             .order_by(models.PriceComponent.from_date)
-        price: models.PriceComponent = self.session.scalars(stmt).first()
-        assert price.amount is not None
+        price: models.PriceComponent | None = self.session.scalars(stmt).first()
+        assert price is not None
         return price.amount
 
     def _get_product_feature_price(self, product_feature: models.ProductFeature) -> Decimal:
@@ -90,8 +91,9 @@ class Seeder:
             .where(models.PriceComponent.from_date < self.now) \
             .where(func.coalesce(models.PriceComponent.thru_date, func.now()) > self.now) \
             .order_by(models.PriceComponent.from_date)
-        price: models.PriceComponent = self.session.scalars(stmt).first()
-        assert price.amount is not None
+        price: models.PriceComponent | None = self.session.scalars(stmt).first()
+        if price is None or price.amount  is None:
+            return Decimal(0)
         return price.amount
 
     def _add_order_item_surcharges(self, order_item: models.OrderItem) -> None:
@@ -618,6 +620,83 @@ class Seeder:
                 distribute_randomly(voucher)
                 self.session.add(voucher)
 
+        self.session.commit()
+
+    def seed_prices(self) -> None:
+        products = self.session.scalars(select(models.Product)).all()
+        for product in tqdm(products, desc="Creating product prices"):
+            from_dt = product.introduction_date
+            while True:
+                thru_dt = from_dt + timedelta(days=random.randint(30, 365))
+                if thru_dt > self.now:
+                    thru_dt = None
+
+                if "BEV" in product.code or "TEA" in product.code or "COF" in product.code:
+                    cost = random.randint(5, 10)
+                elif "DES" in product.code:
+                    cost = random.randint(8, 20)
+                else:
+                    cost = random.randint(8, 30)
+
+                price = models.PriceComponent(
+                    price_type=models.PriceComponent.PriceType.BASE,
+                    product=product,
+                    amount=Decimal(cost),
+                    description=product.name,
+                    from_date=from_dt,
+                    thru_date=thru_dt,
+                    created_by_id=product.created_by_id,
+                )
+                self.session.add(price)
+
+                if thru_dt is None:
+                    break
+                from_dt: datetime = thru_dt
+
+        product_features = self.session.scalars(select(models.ProductFeature)).all()
+        for feature in tqdm(product_features, desc="Creating product feature prices"):
+            from_dt = datetime(2025, 1, 1)
+            while True:
+                thru_dt = from_dt + timedelta(days=random.randint(30, 365))
+                if thru_dt > self.now:
+                    thru_dt = None
+
+                if "SIZE_REG" in feature.code or "SIZE_MED" in feature.code:
+                    cost = random.randint(1, 2)
+                elif "SIZE_LRG" in feature.code or "SIZE_FAM" in feature.code:
+                    cost = random.randint(3, 4)
+                elif "SIZE_XL" in feature.code or "SIZE_FAM" in feature.code:
+                    cost = random.randint(5, 6)
+                elif "CRUST_STUFFED" in feature.code or "CRUST_CHEESE" in feature.code:
+                    cost = random.randint(2, 4)
+                elif "ESP_DOUBLE" in feature.code:
+                    cost = random.randint(4, 8)
+                elif "TOP" in feature.code:
+                    cost = 2
+                elif "EXTRA" in feature.code:
+                    cost = random.randint(2, 4)
+                elif "PTY_BEEF" in feature.code:
+                    cost = random.randint(2, 4)
+                else:
+                    if thru_dt is None:
+                        break
+                    from_dt: datetime = thru_dt
+                    continue
+
+                price = models.PriceComponent(
+                    price_type=models.PriceComponent.PriceType.BASE,
+                    product_feature=feature,
+                    amount=Decimal(cost),
+                    description=feature.name,
+                    from_date=from_dt,
+                    thru_date=thru_dt,
+                    created_by_id=feature.created_by_id,
+                )
+                self.session.add(price)
+
+                if thru_dt is None:
+                    break
+                from_dt: datetime = thru_dt
         self.session.commit()
 
     def seed_orders(self) -> None:
