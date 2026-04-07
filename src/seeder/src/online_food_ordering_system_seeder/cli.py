@@ -22,7 +22,7 @@ def seed(host: str, port: int, sid: str, username: str, password: str) -> None:
     common.Session.configure(bind=engine)
     session = common.Session()
     with Seeder(session) as seeder:
-        factories.MemberWithAddressFactory.create_batch(200)
+        factories.MemberWithAddressFactory.create_batch(100)
         seeder.refresh_cache()
         seeder.seed_memberships()
         seeder.refresh_cache()
