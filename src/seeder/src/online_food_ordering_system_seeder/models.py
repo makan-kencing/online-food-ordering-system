@@ -224,6 +224,7 @@ class Orders(Base, HasId):
     items: Mapped[set[OrderItem]] = relationship(back_populates="order")
     adjustments: Mapped[set[OrderItemAdjustment]] = relationship(back_populates="order")
     restaurant: Mapped[Restaurant] = relationship(back_populates="orders")
+    feedbacks: Mapped[set[Feedback]] = relationship(back_populates="order")
 
     @property
     def subtotal(self) -> Decimal:
@@ -490,15 +491,21 @@ class Feedback(Base, HasId):
 
     __tablename__ = "feedback"
 
-    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"), unique=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"))
     rating: Mapped[int]
     content: Mapped[str | None] = mapped_column(LONG_STRING)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(server_onupdate=func.now())
     status: Mapped[FeedbackType] = mapped_column(SAEnum(FeedbackType, native_enum=False), default=FeedbackType.VISIBLE)
 
+    order: Mapped[Orders] = relationship(back_populates="feedbacks")
     order_item: Mapped[OrderItem] = relationship(back_populates="feedback")
     images: Mapped[set[FeedbackImage]] = relationship(back_populates="feedback")
+
+    __table_args__ = (
+        UniqueConstraint("order_id", "order_item_id"),
+    )
 
 
 class OrderItemAdjustment(Base, HasId):
