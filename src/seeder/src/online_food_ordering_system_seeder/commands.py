@@ -31,7 +31,6 @@ class Seeder:
             models.Member: self.session.scalars(select(models.Member)
                                                 .options(joinedload(models.Member.addresses),
                                                          joinedload(models.Member.subscriptions),
-                                                         joinedload(models.Member.orders),
                                                          joinedload(models.Member.vouchers))).unique().all(),
             models.PaymentMethod: self.session.scalars(select(models.PaymentMethod)).all(),
             models.Membership: self.session.scalars(select(models.Membership)).all(),
@@ -420,7 +419,7 @@ class Seeder:
             .join(models.ProductFeatureGroup.fields) \
             .join(models.ProductFeatureGroupField.product_feature)
         menu_items = self.session.scalars(stmt).unique().all()
-        for menu_item in random.sample(menu_items, k=random.randint(1, max(len(menu_items) // 3, 1))):
+        for menu_item in random.sample(menu_items, k=random.randint(1, max(len(menu_items), 1))):
             product = menu_item.product
             quantity = random.randint(1, 3)
 
@@ -545,7 +544,7 @@ class Seeder:
             return models.Voucher(
                 name=name,
                 description=description,
-                usage_limit=random.randint(100, 500),
+                usage_limit=random.randint(20, 200),
                 from_date=day,
                 thru_date=day + timedelta(days=random.randint(10, 31)),
                 created_by_id=created_by_id
@@ -708,8 +707,9 @@ class Seeder:
 
     def seed_orders(self) -> None:
         for member in tqdm(self.tables[models.Member], desc="Picking members"):
+            affinity = random.randint(3, 30)
             days = pl.date_range(start=member.created_at, end=self.now, interval="1d", eager=True)
-            for day in tqdm(days.sample(fraction=1 / 3).sort(), desc="Creating order"):
+            for day in tqdm(days.sample(fraction=1 / affinity).sort(), desc="Creating order"):
                 restaurant = random.choice(self.tables[models.Restaurant])
                 day = self.faker.date_time_between(
                     start_date=datetime.combine(day, (datetime.min + restaurant.opening_hour).time()),
@@ -717,6 +717,6 @@ class Seeder:
                 )
 
                 orders = self._create_order(member, restaurant, day)
-                member.orders.add(orders)
+                self.session.add(orders)
 
         self.session.commit()
