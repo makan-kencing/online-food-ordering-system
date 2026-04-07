@@ -231,6 +231,9 @@ class Seeder:
 
         price: models.PriceComponent | None = self.session.scalars(
             select(models.PriceComponent)
+            .options(joinedload(models.PriceComponent.voucher)
+                     .joinedload(models.Voucher.distributed_to)
+                     .joinedload(models.VoucherDistribution.redemption))
             .where(models.PriceComponent.voucher_id.in_(
                 (voucher.voucher_id for voucher in filter(lambda d: d.redemption is None, member.vouchers))))
             .where(models.PriceComponent.product_id == order_item.product.id)
@@ -253,9 +256,14 @@ class Seeder:
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
-        ).first()
+        ).unique().first()
 
         if price is None:
+            return None
+
+        assert price.voucher is not None
+        if price.voucher.usage_limit is not None and \
+                price.voucher.usage_limit <= len(tuple(filter(lambda d: d.redemption is not None, price.voucher.distributed_to))):
             return None
 
         order_item.adjustments.add(models.OrderItemAdjustment(
@@ -282,6 +290,9 @@ class Seeder:
 
         price: models.PriceComponent | None = self.session.scalars(
             select(models.PriceComponent)
+            .options(joinedload(models.PriceComponent.voucher)
+                     .joinedload(models.Voucher.distributed_to)
+                     .joinedload(models.VoucherDistribution.redemption))
             .where(models.PriceComponent.voucher_id.in_(
                 (voucher.voucher_id for voucher in filter(lambda d: d.redemption is None, member.vouchers))))
             .where(models.PriceComponent.product_id.is_(expression.Null()))
@@ -304,9 +315,14 @@ class Seeder:
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
-        ).first()
+        ).unique().first()
 
         if price is None:
+            return None
+
+        assert price.voucher is not None
+        if price.voucher.usage_limit is not None and \
+                price.voucher.usage_limit <= len(tuple(filter(lambda d: d.redemption is not None, price.voucher.distributed_to))):
             return None
 
         order_item_feature.order_item.adjustments.add(models.OrderItemAdjustment(
@@ -332,6 +348,9 @@ class Seeder:
 
         price: models.PriceComponent | None = self.session.scalars(
             select(models.PriceComponent)
+            .options(joinedload(models.PriceComponent.voucher)
+                     .joinedload(models.Voucher.distributed_to)
+                     .joinedload(models.VoucherDistribution.redemption))
             .where(models.PriceComponent.voucher_id.in_(
                 (voucher.voucher_id for voucher in filter(lambda d: d.redemption is None, member.vouchers))))
             .where(models.PriceComponent.product_id.is_(expression.Null()))  # for products
@@ -359,6 +378,11 @@ class Seeder:
         ).unique().first()
 
         if price is None:
+            return None
+
+        assert price.voucher is not None
+        if price.voucher.usage_limit is not None and \
+                price.voucher.usage_limit <= len(tuple(filter(lambda d: d.redemption is not None, price.voucher.distributed_to))):
             return None
 
         order.adjustments.add(models.OrderItemAdjustment(
