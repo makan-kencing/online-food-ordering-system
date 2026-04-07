@@ -734,11 +734,19 @@ BEGIN
                   AND parent IS NULL
                   AND ROWNUM = 1;
 
-                INSERT INTO product_category_classification (product_id, product_category_id, from_date, thru_date, is_primary)
-                VALUES (prod.id, v_category_id, CURRENT_TIMESTAMP, NULL, TRUE);
-                v_counter := v_counter + 1;
+                BEGIN
+                    INSERT INTO product_category_classification
+                    (product_id, product_category_id, from_date, thru_date, is_primary)
+                    VALUES
+                        (prod.id, v_category_id, CURRENT_TIMESTAMP, NULL, TRUE);
+                    v_counter := v_counter + 1;
+                EXCEPTION
+                    WHEN DUP_VAL_ON_INDEX THEN
+                        NULL; -- skip if already exists
+                END;
             EXCEPTION
-                WHEN NO_DATA_FOUND THEN NULL;
+                WHEN NO_DATA_FOUND THEN
+                    NULL;
             END;
 
             FOR cat IN (SELECT id
@@ -747,14 +755,20 @@ BEGIN
                           AND parent IS NOT NULL
                           AND ROWNUM <= 2)
                 LOOP
-                    INSERT INTO product_category_classification (product_id, product_category_id, from_date, thru_date, is_primary)
-                    VALUES (prod.id, cat.id, CURRENT_TIMESTAMP, NULL, FALSE);
-                    v_counter := v_counter + 1;
+                    BEGIN
+                        INSERT INTO product_category_classification
+                        (product_id, product_category_id, from_date, thru_date, is_primary)
+                        VALUES
+                            (prod.id, cat.id, CURRENT_TIMESTAMP, NULL, FALSE);
+                        v_counter := v_counter + 1;
+                    EXCEPTION
+                        WHEN DUP_VAL_ON_INDEX THEN
+                            NULL;
+                    END;
                 END LOOP;
         END LOOP;
 
-    FOR i IN 1..200
-        LOOP
+    FOR i IN 1..200 LOOP
             DECLARE
                 v_pid      NUMBER := MOD(i, v_max_product_id) + 1;
                 v_cid      NUMBER := MOD(i, v_max_category_id) + 1;
@@ -765,25 +779,43 @@ BEGIN
                 SELECT COUNT(*) INTO v_c_exists FROM product_category WHERE id = v_cid;
 
                 IF v_p_exists > 0 AND v_c_exists > 0 THEN
-                    INSERT INTO product_category_classification (product_id, product_category_id, from_date, thru_date, is_primary)
-                    VALUES (v_pid,
-                            v_cid,
-                            TO_TIMESTAMP('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
-                                         'YYYY-MM-DD HH24:MI:SS'),
-                            CASE
-                                WHEN MOD(i, 3) = 0
-                                    THEN TO_TIMESTAMP('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
-                                                      'YYYY-MM-DD HH24:MI:SS')
-                                ELSE NULL
-                                END,
-                            CASE WHEN MOD(i, 5) = 0 THEN TRUE ELSE FALSE END);
+                    BEGIN
+                        INSERT INTO product_category_classification
+                        (product_id, product_category_id, from_date, thru_date, is_primary)
+                        VALUES
+                            (
+                                v_pid,
+                                v_cid,
+                                TO_TIMESTAMP('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
+                                             'YYYY-MM-DD HH24:MI:SS'),
+                                CASE
+                                    WHEN MOD(i, 3) = 0 THEN
+                                        TO_TIMESTAMP('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
+                                                     'YYYY-MM-DD HH24:MI:SS')
+                                    ELSE NULL
+                                    END,
+                                CASE
+                                    WHEN NOT EXISTS (
+                                        SELECT 1
+                                        FROM product_category_classification
+                                        WHERE product_id = v_pid
+                                          AND is_primary = TRUE
+                                          AND (thru_date IS NULL OR thru_date > CURRENT_TIMESTAMP)
+                                    )
+                                        THEN TRUE
+                                    ELSE FALSE
+                                    END
+                            );
+                    EXCEPTION
+                        WHEN DUP_VAL_ON_INDEX THEN
+                            NULL;
+                    END;
                 END IF;
             END;
         END LOOP;
 
     DBMS_OUTPUT.PUT_LINE('PRODUCT_CATEGORY_CLASSIFICATION records inserted: ' || v_counter);
 END;
-/
 
 -- 10. MENU_ITEM
 DECLARE
