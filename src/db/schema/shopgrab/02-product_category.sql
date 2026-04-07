@@ -5,4 +5,4 @@ CREATE TABLE product_category
     description   VARCHAR(200)               NOT NULL,
     parent        INT REFERENCES product_category (id),
     created_by_id INT REFERENCES member (id) NOT NULL
-)
+);
