@@ -403,6 +403,7 @@ class Seeder:
             order.delivery = delivery
 
         vouchers: list[models.VoucherDistribution] = []
+        feedback_time = order.ordered_at + timedelta(minutes=30, seconds=random.randint(0, 3600))
 
         stmt = select(models.MenuItem) \
             .options(contains_eager(models.MenuItem.product),
@@ -468,6 +469,23 @@ class Seeder:
                         if voucher:
                             vouchers.append(voucher)
 
+            if random.randint(1, 10):
+                feedback = models.Feedback(
+                    order=order,
+                    order_item=order_item,
+                    rating=random.randint(1, 10),
+                    content=" ".join(self.faker.sentences(2)) if random.randint(1, 2) == 1 else "",
+                    created_at=feedback_time,
+                )
+                n = max(random.randint(1, 8) - 5, 0)
+                for _ in range(n):
+                    feedback.images.add(models.FeedbackImage(
+                        feedback=feedback,
+                        image_url=self.faker.image_url(),
+                        uploaded_at=feedback.created_at
+                    ))
+                order.feedbacks.add(feedback)
+
         self._add_order_surcharges(order)
         if random.randint(1, 2) == 1:
             voucher = self._apply_first_order_voucher(order, member)
@@ -493,6 +511,22 @@ class Seeder:
             voucher.redemption.invoice = invoice
             invoice.vouchers.add(voucher.redemption)
         order.invoice = invoice
+
+        if random.randint(1, 10):
+            feedback = models.Feedback(
+                order=order,
+                rating=random.randint(1, 10),
+                content=" ".join(self.faker.sentences(2)) if random.randint(1, 3) == 1 else "",
+                created_at=feedback_time,
+            )
+            n = max(random.randint(1, 8) - 5, 0)
+            for _ in range(n):
+                feedback.images.add(models.FeedbackImage(
+                    feedback=feedback,
+                    image_url=self.faker.image_url(),
+                    uploaded_at=feedback.created_at
+                ))
+            order.feedbacks.add(feedback)
 
         return order
 
@@ -530,8 +564,6 @@ class Seeder:
                 member.subscriptions.add(subscription)
                 current_dt += timedelta(days=30)
 
-        self.session.commit()
-
     def seed_vouchers(self) -> None:
         def distribute_randomly(voucher: models.Voucher) -> None:
             for member in random.choices(self.tables[models.Member], k=voucher.usage_limit + random.randint(-100, 100)):
@@ -563,7 +595,6 @@ class Seeder:
             )
 
         for restaurant in tqdm(self.tables[models.Restaurant], desc="Picking restaurants"):
-
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
             for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Creating vouchers"), start=1):
                 if random.randint(1, 2) == 1:
@@ -625,8 +656,6 @@ class Seeder:
                 voucher.priced.add(price)  # noqa
                 distribute_randomly(voucher)
                 self.session.add(voucher)
-
-        self.session.commit()
 
     def seed_prices(self) -> None:
         products = self.session.scalars(select(models.Product)).all()
@@ -703,7 +732,6 @@ class Seeder:
                 if thru_dt is None:
                     break
                 from_dt: datetime = thru_dt
-        self.session.commit()
 
     def seed_orders(self) -> None:
         for member in tqdm(self.tables[models.Member], desc="Picking members"):
@@ -718,5 +746,3 @@ class Seeder:
 
                 orders = self._create_order(member, restaurant, day)
                 self.session.add(orders)
-
-        self.session.commit()
