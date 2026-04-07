@@ -123,7 +123,7 @@ class Seeder:
             .where(literal(self.now).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
-            .join(models.PriceComponent.quantity_break, is_outer=True)
+            .join(models.PriceComponent.quantity_break, isouter=True)
         ).all()
         for price in prices:
             adjustment_type = models.OrderItemAdjustment.AdjustmentType.SURCHARGE
@@ -166,7 +166,7 @@ class Seeder:
             .where(literal(self.now).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
-            .join(models.PriceComponent.quantity_break, is_outer=True)
+            .join(models.PriceComponent.quantity_break, isouter=True)
         ).all()
         for price in prices:
             adjustment_type = models.OrderItemAdjustment.AdjustmentType.SURCHARGE
@@ -208,7 +208,7 @@ class Seeder:
             .where(literal(self.now).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
-            .join(models.PriceComponent.order_value, is_outer=True)
+            .join(models.PriceComponent.order_value, isouter=True)
         ).all()
         for price in prices:
             adjustment_type = models.OrderItemAdjustment.AdjustmentType.SURCHARGE
@@ -254,7 +254,7 @@ class Seeder:
             .where(literal(self.now).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
-            .join(models.PriceComponent.quantity_break, is_outer=True)
+            .join(models.PriceComponent.quantity_break, isouter=True)
         ).first()
 
         if price is None:
@@ -306,7 +306,7 @@ class Seeder:
             .where(literal(self.now).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
-            .join(models.PriceComponent.quantity_break, is_outer=True)
+            .join(models.PriceComponent.quantity_break, isouter=True)
         ).first()
 
         if price is None:
@@ -359,7 +359,7 @@ class Seeder:
             .where(literal(self.now).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
-            .join(models.PriceComponent.order_value, is_outer=True)
+            .join(models.PriceComponent.order_value, isouter=True)
         ).unique().first()
 
         if price is None:
