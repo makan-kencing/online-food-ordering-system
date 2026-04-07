@@ -35,7 +35,7 @@ begin
             raise_application_error(-20322, 'Voucher cannot be found');
     end;
 
-    if (v_within_usage_limit = true) then
+    if (v_within_usage_limit = false) then
         raise voucher_fully_redeemed;
     end if;
 
