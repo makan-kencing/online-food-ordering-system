@@ -119,7 +119,7 @@ class Seeder:
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -162,7 +162,7 @@ class Seeder:
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -204,7 +204,7 @@ class Seeder:
                            (models.PriceComponent.vendor_id == order.delivery.vendor_id)
                            if order.delivery is not None else literal(False)))
             .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.order_value, isouter=True)
@@ -249,8 +249,7 @@ class Seeder:
                                 if subscription is not None else literal(False))))
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
-            .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -301,8 +300,7 @@ class Seeder:
                                 if subscription is not None else literal(False))))
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
-            .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -354,8 +352,7 @@ class Seeder:
             .where(if_then(models.PriceComponent.vendor_id.is_not(expression.Null()),
                            (models.PriceComponent.vendor_id == order.delivery.vendor_id)
                            if order.delivery is not None else literal(False)))
-            .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.order_value, isouter=True)
@@ -420,9 +417,9 @@ class Seeder:
             .join(models.ProductFeatureGroup.fields) \
             .join(models.ProductFeatureGroupField.product_feature)
         menu_items = self.session.scalars(stmt).unique().all()
-        for menu_item in random.sample(menu_items, k=random.randint(1, max(len(menu_items), 1))):
+        for menu_item in random.sample(menu_items, k=max(int(random.random() ** 4 * len(menu_items)), 1)):
             product = menu_item.product
-            quantity = random.randint(1, 3)
+            quantity = random.choices((1, 2, 3), k=1, weights=[0.8, 0.15, 0.05])[0]
 
             order_item = models.OrderItem(
                 order=order,
@@ -598,9 +595,9 @@ class Seeder:
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
             for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Creating vouchers"), start=1):
                 if random.randint(1, 2) == 1:
-                    value = Decimal(f"0.{random.randint(1, 10)}")
+                    value = Decimal(f"0.{random.randint(1, 10):02}")
                 else:
-                    value = Decimal(random.choice((5, 10, 25)))
+                    value = Decimal(random.choice((2, 3, 5)))
                 match random.randint(1, 7):
                     case 1 | 2 | 3:
                         product = self.session.scalars(
