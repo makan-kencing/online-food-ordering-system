@@ -420,7 +420,7 @@ class Seeder:
             .join(models.ProductFeatureGroup.fields) \
             .join(models.ProductFeatureGroupField.product_feature)
         menu_items = self.session.scalars(stmt).unique().all()
-        for menu_item in random.choices(menu_items, k=random.randint(1, max(len(menu_items) // 3, 1))):
+        for menu_item in random.sample(menu_items, k=random.randint(1, max(len(menu_items) // 3, 1))):
             product = menu_item.product
             quantity = random.randint(1, 3)
 
@@ -446,7 +446,7 @@ class Seeder:
                 else:
                     k = group.min
 
-                for field in random.choices(tuple(group.fields), k=k):
+                for field in random.sample(tuple(group.fields), k=k):
                     field: models.ProductFeatureGroupField
                     product_feature = field.product_feature
 
