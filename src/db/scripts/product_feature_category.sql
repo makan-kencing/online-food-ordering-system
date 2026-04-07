@@ -220,17 +220,21 @@ CREATE OR REPLACE TRIGGER trg_prevent_product_delete
 DECLARE
     v_attribute_count INT;
     v_classification_count INT;
+    
 BEGIN
     SELECT COUNT(*) INTO v_attribute_count FROM product_attribute WHERE product_id = :OLD.id;
     SELECT COUNT(*) INTO v_classification_count FROM product_category_classification WHERE product_id = :OLD.id;
 
     IF v_attribute_count > 0 THEN
-        RAISE_APPLICATION_ERROR(-20021, 'Cannot delete product: It has ' || v_attribute_count || ' feature group(s) assigned.');
+        RAISE my_custom_exc;        
     END IF;
 
     IF v_classification_count > 0 THEN
         RAISE_APPLICATION_ERROR(-20022, 'Cannot delete product: It has ' || v_classification_count || ' category classification(s).');
     END IF;
+EXCEPTION
+    WHEN my_custom_exc THEN
+        RAISE_APPLICATION_ERROR(-20021, 'Cannot delete product: It has ' || v_attribute_count || ' feature group(s) assigned.');
 END;
 /
 
@@ -626,15 +630,15 @@ SELECT * FROM vw_product_category_hierarchy;
 
 
 BEGIN
-    setup_product(
-            'PIZ-DELUX-1',
-            'Deluxe Pizza',
-        'Our signature deluxe pizza',
-            'Size:Regular,Large,Personal|Crust:Thin,Pan,Stuffed|Spice:Mild,Medium,Hot'
-    );
-    add_feature_to_product('PIZ-MRG-1', 'Extra Cheese', 'TOP_EXCHZ', 'Toppings');
-    add_feature_group_to_product('PIZ-MRG-1', 'Premium Toppings', 'Extra Cheese,Extra Pepperoni,Extra Mushroom');
-    feature_usage_report(10, 1);
+--     setup_product(
+--             'PIZ-DELUX-1',
+--             'Deluxe Pizza',
+--         'Our signature deluxe pizza',
+--             'Size:Regular,Large,Personal|Crust:Thin,Pan,Stuffed|Spice:Mild,Medium,Hot'
+--     );
+--     add_feature_to_product('PIZ-MRG-1', 'Extra Cheese', 'TOP_EXCHZ', 'Toppings');
+--     add_feature_group_to_product('PIZ-MRG-1', 'Premium Toppings', 'Extra Cheese,Extra Pepperoni,Extra Mushroom');
+--     feature_usage_report(5, 1);
     product_category_summary_report;
 END;
 /
