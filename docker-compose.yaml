@@ -9,6 +9,7 @@ services:
             APP_USER_PASSWORD: ${DB_PASSWORD}
         volumes:
             - oracle-data:/opt/oracle/oradata
+            - ./var/shared:/shared
         healthcheck:
             test: [ "CMD", "healthcheck.sh" ]
             interval: 10s
