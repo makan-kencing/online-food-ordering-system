@@ -16,5 +16,5 @@ CREATE TABLE order_item_adjustment
     adjustment_type adjustment_type             NOT NULL,
     amount          DECIMAL CHECK ( amount > 0 ),
     percentage      DECIMAL(5, 4) CHECK ( percentage > 0 AND percentage < 1 ),
-    CHECK ( amount IS NULL != percentage IS NULL )
+    CHECK ( (amount IS NULL) != (percentage IS NULL) )
 );
