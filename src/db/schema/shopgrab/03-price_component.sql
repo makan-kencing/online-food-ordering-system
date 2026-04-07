@@ -29,9 +29,7 @@ CREATE TABLE price_component
     CHECK ( thru_date is null or thru_date > from_date ),
     CHECK ( coalesce(product_id, product_feature_id, product_category_id, -- at least one condition
                      quantity_break_id, order_value_id, restaurant_id,
-                     membership_id, voucher_id, vendor_id) IS NOT NULL ),
-    UNIQUE (product_id, product_feature_id, product_category_id, quantity_break_id, order_value_id, restaurant_id,
-            membership_id, voucher_id, vendor_id)
+                     membership_id, voucher_id, vendor_id) IS NOT NULL )
 );
 
 create index idx_price_time_range on price_component (from_date, thru_date);
