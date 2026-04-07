@@ -249,13 +249,12 @@ BEGIN
         CLOSE cur_groups;
 
         DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-        DBMS_OUTPUT.PUT_LINE('');
     END LOOP;
     CLOSE cur_restaurants;
 
     -- Footer
     DBMS_OUTPUT.PUT_LINE(LPAD('END OF MENU ITEM DETAILED REPORT', v_line_width/2 + 10));
-    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 END;
 /
 
