@@ -492,7 +492,7 @@ class Feedback(Base, HasId):
     __tablename__ = "feedback"
 
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
-    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_item.id"))
+    order_item_id: Mapped[int | None] = mapped_column(ForeignKey("order_item.id"))
     rating: Mapped[int]
     content: Mapped[str | None] = mapped_column(LONG_STRING)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
