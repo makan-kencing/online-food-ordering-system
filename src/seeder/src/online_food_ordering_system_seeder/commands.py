@@ -490,7 +490,7 @@ class Seeder:
                         if voucher:
                             vouchers.append(voucher)
 
-            if random.randint(1, 10):
+            if random.randint(1, 5) == 1:
                 feedback = models.Feedback(
                     order=order,
                     order_item=order_item,
