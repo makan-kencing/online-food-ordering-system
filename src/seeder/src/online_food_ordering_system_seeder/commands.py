@@ -437,6 +437,7 @@ class Seeder:
                 if voucher:
                     vouchers.append(voucher)
 
+            features = set()
             for attribute in product.attributes:
                 attribute: models.ProductAttribute
                 group = attribute.product_feature_group
@@ -445,10 +446,15 @@ class Seeder:
                     k = random.randint(group.min, (group.max or len(group.fields)))
                 else:
                     k = group.min
+                k = min(k, len(group.fields))
 
                 for field in random.sample(tuple(group.fields), k=k):
                     field: models.ProductFeatureGroupField
                     product_feature = field.product_feature
+
+                    if product_feature in features:
+                        continue
+                    features.add(product_feature)
 
                     order_item_feature = models.OrderItemFeature(
                         product_feature=product_feature,
