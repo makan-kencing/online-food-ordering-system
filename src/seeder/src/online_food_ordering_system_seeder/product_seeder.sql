@@ -635,20 +635,22 @@ BEGIN
 
             BEGIN
                 SELECT id INTO v_category_id FROM product_category
-                WHERE created_by_id = v_created_by AND ROWNUM = 1;
+                WHERE created_by_id = v_created_by
+                  AND parent IS NULL
+                  AND ROWNUM = 1;
 
                 INSERT INTO product_category_classification (product_id, product_category_id, from_date, thru_date, is_primary)
-                VALUES (prod.id, v_category_id, DATE '2024-01-01', NULL, TRUE);
+                VALUES (prod.id, v_category_id, CURRENT_TIMESTAMP, NULL, TRUE);
                 v_counter := v_counter + 1;
             EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
             END;
 
             FOR cat IN (SELECT id FROM product_category
                         WHERE created_by_id = v_created_by
-                          AND (v_category_id IS NULL OR id != v_category_id)
+                          AND parent IS NOT NULL
                           AND ROWNUM <= 2) LOOP
                     INSERT INTO product_category_classification (product_id, product_category_id, from_date, thru_date, is_primary)
-                    VALUES (prod.id, cat.id, DATE '2024-01-01', NULL, FALSE);
+                    VALUES (prod.id, cat.id, CURRENT_TIMESTAMP, NULL, FALSE);
                     v_counter := v_counter + 1;
                 END LOOP;
         END LOOP;
@@ -668,9 +670,9 @@ BEGIN
                     VALUES (
                                v_pid,
                                v_cid,
-                               TO_DATE('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01', 'YYYY-MM-DD'),
+                               TO_TIMESTAMP('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00', 'YYYY-MM-DD HH24:MI:SS'),
                                CASE WHEN MOD(i, 3) = 0
-                                        THEN TO_DATE('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01', 'YYYY-MM-DD')
+                                        THEN TO_TIMESTAMP('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00', 'YYYY-MM-DD HH24:MI:SS')
                                     ELSE NULL
                                    END,
                                CASE WHEN MOD(i, 5) = 0 THEN TRUE ELSE FALSE END
@@ -678,8 +680,12 @@ BEGIN
                 END IF;
             END;
         END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('PRODUCT_CATEGORY_CLASSIFICATION records inserted: ' || v_counter);
 END;
 /
+
+COMMIT;
 
 -- 10. MENU_ITEM
 DECLARE
