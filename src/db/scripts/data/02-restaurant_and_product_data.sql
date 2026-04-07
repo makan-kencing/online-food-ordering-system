@@ -814,51 +814,51 @@ BEGIN
                 END LOOP;
         END LOOP;
 
-    FOR i IN 1..200 LOOP
-            DECLARE
-                v_pid      NUMBER := MOD(i, v_max_product_id) + 1;
-                v_cid      NUMBER := MOD(i, v_max_category_id) + 1;
-                v_p_exists NUMBER;
-                v_c_exists NUMBER;
-            BEGIN
-                SELECT COUNT(*) INTO v_p_exists FROM product WHERE id = v_pid;
-                SELECT COUNT(*) INTO v_c_exists FROM product_category WHERE id = v_cid;
-
-                IF v_p_exists > 0 AND v_c_exists > 0 THEN
-                    BEGIN
-                        INSERT INTO product_category_classification
-                        (product_id, product_category_id, from_date, thru_date, is_primary)
-                        VALUES
-                            (
-                                v_pid,
-                                v_cid,
-                                TO_TIMESTAMP('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
-                                             'YYYY-MM-DD HH24:MI:SS'),
-                                CASE
-                                    WHEN MOD(i, 3) = 0 THEN
-                                        TO_TIMESTAMP('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
-                                                     'YYYY-MM-DD HH24:MI:SS')
-                                    ELSE NULL
-                                    END,
-                                CASE
-                                    WHEN NOT EXISTS (
-                                        SELECT 1
-                                        FROM product_category_classification
-                                        WHERE product_id = v_pid
-                                          AND is_primary = TRUE
-                                          AND (thru_date IS NULL OR thru_date > CURRENT_TIMESTAMP)
-                                    )
-                                        THEN TRUE
-                                    ELSE FALSE
-                                    END
-                            );
-                    EXCEPTION
-                        WHEN DUP_VAL_ON_INDEX THEN
-                            NULL;
-                    END;
-                END IF;
-            END;
-        END LOOP;
+--     FOR i IN 1..200 LOOP
+--             DECLARE
+--                 v_pid      NUMBER := MOD(i, v_max_product_id) + 1;
+--                 v_cid      NUMBER := MOD(i, v_max_category_id) + 1;
+--                 v_p_exists NUMBER;
+--                 v_c_exists NUMBER;
+--             BEGIN
+--                 SELECT COUNT(*) INTO v_p_exists FROM product WHERE id = v_pid;
+--                 SELECT COUNT(*) INTO v_c_exists FROM product_category WHERE id = v_cid;
+--
+--                 IF v_p_exists > 0 AND v_c_exists > 0 THEN
+--                     BEGIN
+--                         INSERT INTO product_category_classification
+--                         (product_id, product_category_id, from_date, thru_date, is_primary)
+--                         VALUES
+--                             (
+--                                 v_pid,
+--                                 v_cid,
+--                                 TO_TIMESTAMP('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
+--                                              'YYYY-MM-DD HH24:MI:SS'),
+--                                 CASE
+--                                     WHEN MOD(i, 3) = 0 THEN
+--                                         TO_TIMESTAMP('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
+--                                                      'YYYY-MM-DD HH24:MI:SS')
+--                                     ELSE NULL
+--                                     END,
+--                                 CASE
+--                                     WHEN NOT EXISTS (
+--                                         SELECT 1
+--                                         FROM product_category_classification
+--                                         WHERE product_id = v_pid
+--                                           AND is_primary = TRUE
+--                                           AND (thru_date IS NULL OR thru_date > CURRENT_TIMESTAMP)
+--                                     )
+--                                         THEN TRUE
+--                                     ELSE FALSE
+--                                     END
+--                             );
+--                     EXCEPTION
+--                         WHEN DUP_VAL_ON_INDEX THEN
+--                             NULL;
+--                     END;
+--                 END IF;
+--             END;
+--         END LOOP;
 
     DBMS_OUTPUT.PUT_LINE('PRODUCT_CATEGORY_CLASSIFICATION records inserted: ' || v_counter);
 END;
@@ -913,37 +913,37 @@ BEGIN
                 END LOOP;
         END LOOP;
 
-    FOR i IN 1..200
-        LOOP
-            DECLARE
-                v_pid      NUMBER := MOD(i, v_max_product_id) + 1;
-                v_rid      NUMBER := MOD(i, v_max_restaurant_id) + 1;
-                v_gid      NUMBER := MOD(i, v_max_group_id) + 1;
-                v_p_exists NUMBER;
-                v_r_exists NUMBER;
-                v_g_exists NUMBER;
-            BEGIN
-                SELECT COUNT(*) INTO v_p_exists FROM product WHERE id = v_pid;
-                SELECT COUNT(*) INTO v_r_exists FROM restaurant WHERE id = v_rid;
-                SELECT COUNT(*) INTO v_g_exists FROM menu_item_group WHERE id = v_gid;
-
-                IF v_p_exists > 0 AND v_r_exists > 0 AND v_g_exists > 0 THEN
-                    INSERT INTO menu_item (product_id, restaurant_id, group_id, is_unavailable, from_date, thru_date)
-                    VALUES (v_pid,
-                            v_rid,
-                            v_gid,
-                            CASE WHEN MOD(i, 10) = 0 THEN TRUE ELSE FALSE END,
-                            TO_DATE('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01', 'YYYY-MM-DD'),
-                            CASE
-                                WHEN MOD(i, 5) = 0
-                                    THEN TO_DATE('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-28', 'YYYY-MM-DD')
-                                ELSE NULL
-                                END);
-                END IF;
-            EXCEPTION
-                WHEN DUP_VAL_ON_INDEX THEN NULL;
-            END;
-        END LOOP;
+--     FOR i IN 1..200
+--         LOOP
+--             DECLARE
+--                 v_pid      NUMBER := MOD(i, v_max_product_id) + 1;
+--                 v_rid      NUMBER := MOD(i, v_max_restaurant_id) + 1;
+--                 v_gid      NUMBER := MOD(i, v_max_group_id) + 1;
+--                 v_p_exists NUMBER;
+--                 v_r_exists NUMBER;
+--                 v_g_exists NUMBER;
+--             BEGIN
+--                 SELECT COUNT(*) INTO v_p_exists FROM product WHERE id = v_pid;
+--                 SELECT COUNT(*) INTO v_r_exists FROM restaurant WHERE id = v_rid;
+--                 SELECT COUNT(*) INTO v_g_exists FROM menu_item_group WHERE id = v_gid;
+--
+--                 IF v_p_exists > 0 AND v_r_exists > 0 AND v_g_exists > 0 THEN
+--                     INSERT INTO menu_item (product_id, restaurant_id, group_id, is_unavailable, from_date, thru_date)
+--                     VALUES (v_pid,
+--                             v_rid,
+--                             v_gid,
+--                             CASE WHEN MOD(i, 10) = 0 THEN TRUE ELSE FALSE END,
+--                             TO_DATE('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01', 'YYYY-MM-DD'),
+--                             CASE
+--                                 WHEN MOD(i, 5) = 0
+--                                     THEN TO_DATE('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-28', 'YYYY-MM-DD')
+--                                 ELSE NULL
+--                                 END);
+--                 END IF;
+--             EXCEPTION
+--                 WHEN DUP_VAL_ON_INDEX THEN NULL;
+--             END;
+--         END LOOP;
 END;
 /
 
