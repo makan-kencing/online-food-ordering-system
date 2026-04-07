@@ -17,4 +17,5 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
+SHELL ["/bin/bash", "-c"]
 ENTRYPOINT uv run seed --host ${TARGET_HOST} --port ${TARGET_PORT} --sid ${TARGET_SID} --username ${DB_USERNAME} --password ${DB_PASSWORD}
