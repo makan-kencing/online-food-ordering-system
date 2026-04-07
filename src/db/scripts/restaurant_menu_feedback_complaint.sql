@@ -167,101 +167,158 @@ END;
 commit;
 
 --Report - 1 
---Each restaurant menu with menu item data
-CREATE OR REPLACE PROCEDURE proc_menu_detailed_report (p_restaurant_id IN NUMBER DEFAULT NULL) IS
+--Display a restaurant's menu items revenue (including total revenue and top item revenue)
+CREATE OR REPLACE PROCEDURE proc_menu_revenue_report (
+    p_restaurant_id IN NUMBER DEFAULT NULL
+) IS
+
     v_line_width CONSTANT NUMBER := 120;
-    v_item_count NUMBER;
+
+    v_category_total NUMBER := 0;
+    v_restaurant_total NUMBER := 0;
+
+    v_top_item_name VARCHAR2(100);
+    v_top_item_revenue NUMBER := 0;
 
     CURSOR cur_restaurants IS
-        SELECT *
+        SELECT id, name, code
         FROM restaurant
-        WHERE p_restaurant_id IS NULL OR id = p_restaurant_id
+        WHERE id = p_restaurant_id
         ORDER BY name;
 
-    CURSOR cur_groups (p_restaurant NUMBER) IS
-        SELECT g.id, g.name
+    CURSOR cur_categories(p_restaurant NUMBER) IS
+        SELECT DISTINCT g.id, g.name
         FROM menu_item_group g
-                 JOIN menu_item m ON m.group_id = g.id
-        WHERE m.restaurant_id = p_restaurant
-        GROUP BY g.id, g.name
+                 JOIN menu_item mi ON mi.group_id = g.id
+        WHERE mi.restaurant_id = p_restaurant
         ORDER BY g.name;
 
-    CURSOR cur_items (p_restaurant NUMBER, p_group NUMBER) IS
-        SELECT mi.product_id, p.name AS product_name, mi.is_unavailable,
-               mi.from_date, mi.thru_date
+    CURSOR cur_items(p_restaurant NUMBER, p_group NUMBER) IS
+        SELECT
+            p.name AS product_name,
+            NVL(SUM(oi.quantity * oi.unit_price),0) AS revenue,
+            NVL(SUM(oi.quantity),0) AS quantity_sold
         FROM menu_item mi
                  JOIN product p ON mi.product_id = p.id
+                 LEFT JOIN order_item oi ON oi.product_id = p.id
+                 LEFT JOIN orders o ON o.id = oi.order_id
         WHERE mi.restaurant_id = p_restaurant
           AND mi.group_id = p_group
-        ORDER BY p.name;
+        GROUP BY p.name
+        ORDER BY revenue DESC;
 
     rec_restaurant cur_restaurants%ROWTYPE;
-    rec_group cur_groups%ROWTYPE;
+    rec_category cur_categories%ROWTYPE;
     rec_item cur_items%ROWTYPE;
 
+    v_exists NUMBER;
+
 BEGIN
-    --Header
+
+    IF p_restaurant_id IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20001,
+                                'Restaurant ID parameter is required.');
+    END IF;
+
+    SELECT COUNT(*)
+    INTO v_exists
+    FROM restaurant
+    WHERE id = p_restaurant_id;
+
+    IF v_exists = 0 THEN
+        RAISE_APPLICATION_ERROR(-20002,
+                                'Restaurant ID does not exist.');
+    END IF;
+
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('MENU ITEM DETAILED REPORT', v_line_width/2 + 15));
+    DBMS_OUTPUT.PUT_LINE(LPAD('RESTAURANT MENU REVENUE REPORT', v_line_width/2 + 15));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE('‎');
 
     OPEN cur_restaurants;
     LOOP
         FETCH cur_restaurants INTO rec_restaurant;
         EXIT WHEN cur_restaurants%NOTFOUND;
 
+        v_restaurant_total := 0;
+        v_top_item_revenue := 0;
+        v_top_item_name := NULL;
+
         DBMS_OUTPUT.PUT_LINE('Restaurant: ' || rec_restaurant.name || ' (' || rec_restaurant.code || ')');
         DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+        DBMS_OUTPUT.PUT_LINE('‎');
 
-        OPEN cur_groups(rec_restaurant.id);
+        OPEN cur_categories(rec_restaurant.id);
         LOOP
-            FETCH cur_groups INTO rec_group;
-            EXIT WHEN cur_groups%NOTFOUND;
+            FETCH cur_categories INTO rec_category;
+            EXIT WHEN cur_categories%NOTFOUND;
 
-            SELECT COUNT(*) INTO v_item_count
-            FROM menu_item
-            WHERE restaurant_id = rec_restaurant.id
-              AND group_id = rec_group.id;
+            v_category_total := 0;
 
-            DBMS_OUTPUT.PUT_LINE('Menu Item Group: ' || rec_group.name || ' (' || v_item_count || ' items)');
+            DBMS_OUTPUT.PUT_LINE('Category: ' || rec_category.name);
             DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
-            DBMS_OUTPUT.PUT_LINE(RPAD('ITEM NAME', 40) || RPAD('AVAILABLE', 10) || RPAD('FROM DATE', 25) || RPAD('THRU DATE', 25));
-            DBMS_OUTPUT.PUT_LINE(RPAD('-', 100, '-'));
+            -- Header for menu items
+            DBMS_OUTPUT.PUT_LINE(
+                    RPAD('MENU ITEM',40) ||
+                    RPAD('QUANTITY SOLD',25) ||
+                    RPAD('REVENUE (RM)',20)
+            );
+            DBMS_OUTPUT.PUT_LINE(RPAD('-', 80, '-'));
 
-            OPEN cur_items(rec_restaurant.id, rec_group.id);
+            OPEN cur_items(rec_restaurant.id, rec_category.id);
             LOOP
                 FETCH cur_items INTO rec_item;
                 EXIT WHEN cur_items%NOTFOUND;
 
                 DBMS_OUTPUT.PUT_LINE(
-                        RPAD(rec_item.product_name, 40) ||
-                        RPAD(CASE WHEN rec_item.is_unavailable THEN 'No' ELSE 'Yes' END, 10) ||
-                        RPAD(TO_CHAR(rec_item.from_date, 'YYYY-MM-DD HH24:MI'), 25) ||
-                        RPAD(CASE WHEN rec_item.thru_date IS NULL THEN 'N/A' ELSE TO_CHAR(rec_item.thru_date, 'YYYY-MM-DD HH24:MI') END, 25)
+                        RPAD(rec_item.product_name,40) ||
+                        LPAD(rec_item.quantity_sold,13) ||
+                        LPAD(TO_CHAR(rec_item.revenue,'999,999.99'),23)
                 );
+
+                v_category_total := v_category_total + rec_item.revenue;
+                v_restaurant_total := v_restaurant_total + rec_item.revenue;
+
+                IF rec_item.revenue > v_top_item_revenue THEN
+                    v_top_item_revenue := rec_item.revenue;
+                    v_top_item_name := rec_item.product_name;
+                END IF;
+
             END LOOP;
             CLOSE cur_items;
 
-            DBMS_OUTPUT.PUT_LINE('‎ ‎ ‎ ‎ ‎ '); -- this is invisible character because some reason putting " " doesn't print a blank line for me
+            DBMS_OUTPUT.PUT_LINE(RPAD('-',80,'-'));
+            DBMS_OUTPUT.PUT_LINE('Category Total Revenue: RM ' || TO_CHAR(v_category_total,'999,999.99'));
+            DBMS_OUTPUT.PUT_LINE('‎');
+
         END LOOP;
-        CLOSE cur_groups;
+        CLOSE cur_categories;
+
+        DBMS_OUTPUT.PUT_LINE(RPAD('-',80,'-'));
+        DBMS_OUTPUT.PUT_LINE('Restaurant Total Revenue: RM ' || TO_CHAR(v_restaurant_total,'999,999.99'));
+
+        IF v_top_item_name IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('Top Revenue Item: ' || v_top_item_name ||
+                                 ' (RM ' || TO_CHAR(v_top_item_revenue,'999,999.99') || ')');
+        END IF;
 
         DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+
     END LOOP;
     CLOSE cur_restaurants;
 
-    -- Footer
-    DBMS_OUTPUT.PUT_LINE(LPAD('END OF MENU ITEM DETAILED REPORT', v_line_width/2 + 10));
+    DBMS_OUTPUT.PUT_LINE('END OF REPORT');
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+
 END;
 /
 
 commit;
 
--- EXEC proc_menu_detailed_report;      //display all
--- EXEC proc_menu_detailed_report(1);   //display specific restaurant
+-- EXEC proc_menu_revenue_report;        //invalid: no input
+-- EXEC proc_menu_revenue_report(x);     //invalid: wrong input
+-- EXEC proc_menu_detailed_report(1);    //display restaurant revenue
 
 -- Report - 2
 -- Product feedback detailed report, can choose to display all product or display specific product
