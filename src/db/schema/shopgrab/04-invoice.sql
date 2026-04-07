@@ -4,5 +4,5 @@ CREATE TABLE invoice
     order_id    INT REFERENCES orders (id) UNIQUE   NOT NULL,
     payment_id  INT REFERENCES payment (id) UNIQUE  NOT NULL,
     invoiced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    amount      DECIMAL CHECK ( amount > 0 )        NOT NULL
+    amount      DECIMAL CHECK ( amount >= 0 )        NOT NULL
 );
