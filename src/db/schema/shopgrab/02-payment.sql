@@ -4,6 +4,6 @@ CREATE TABLE payment
     payment_method_id   INT REFERENCES payment_method (id)  NOT NULl,
     paid_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     ref_no              VARCHAR(200)                        NOT NULL,
-    amount              DECIMAL CHECK ( amount > 0 )        NOT NULL,
+    amount              DECIMAL CHECK ( amount >= 0 )        NOT NULL,
     payment_method_data JSON                                NOT NULL
 );

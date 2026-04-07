@@ -413,13 +413,13 @@ END;
 
 --REPORT -2 ：monthly_payment_method_using_summary_report
  CREATE OR REPLACE PROCEDURE monthly_payment_method_summary_report (
-        p_year  IN NUMBER,
-        p_month IN NUMBER) IS
+    p_year  IN NUMBER,
+    p_month IN NUMBER) IS
 
     v_curr_year       NUMBER := EXTRACT(YEAR FROM SYSDATE);
     v_curr_month      NUMBER := EXTRACT(MONTH FROM SYSDATE);
 
-    v_target_year     NUMBER :=  p_year;
+    v_target_year     NUMBER := p_year;
     v_target_month    NUMBER := p_month;
     v_pay_method_id   PAYMENT_METHOD.ID%TYPE;
     v_pay_method_name PAYMENT_METHOD.NAME%TYPE;
@@ -432,7 +432,11 @@ END;
     v_max_qty         NUMBER := -1;
     v_best_method     VARCHAR2(100) := 'N/A';
 
-    v_line_width      CONSTANT NUMBER := 70;
+    v_line_width      CONSTANT NUMBER := 80;
+    v_col1_w          CONSTANT NUMBER := 10;
+    v_col2_w          CONSTANT NUMBER := 25;
+    v_col3_w          CONSTANT NUMBER := 15;
+    v_col4_w          CONSTANT NUMBER := 20;
 
     CURSOR payMetTypeCursor IS
         SELECT ID, NAME FROM PAYMENT_METHOD ORDER BY ID;
@@ -448,11 +452,9 @@ END;
     payRec payDetailCursor%ROWTYPE;
 
 BEGIN
-
     IF v_target_year > v_curr_year THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Error: The year ' || v_target_year || ' is in the future. Please enter a valid year.');
+        RAISE_APPLICATION_ERROR(-20001, 'Error: The year ' || v_target_year || ' is in the future.');
     END IF;
-
 
     IF v_target_month < 1 OR v_target_month > 12 THEN
         RAISE_APPLICATION_ERROR(-20002, 'Error: Month must be between 1 and 12.');
@@ -461,9 +463,11 @@ BEGIN
     IF v_target_year = v_curr_year AND v_target_month > v_curr_month THEN
         RAISE_APPLICATION_ERROR(-20003, 'Error: Data for ' || v_target_year || '-' || v_target_month || ' does not exist yet.');
     END IF;
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE('|' || LPAD(' ', 12) || 'MONTHLY PAYMENT METHOD SUMMARY: ' || v_target_year || '-' || LPAD(v_target_month, 2, '0') || LPAD(' ', 12) || '|');
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
+
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('MONTHLY PAYMENT METHOD SUMMARY REPORT', (v_line_width + 36)/2));
+    DBMS_OUTPUT.PUT_LINE(LPAD('Period: ' || v_target_year || '-' || LPAD(v_target_month, 2, '0'), (v_line_width + 16)/2));
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 
     OPEN payMetTypeCursor;
     LOOP
@@ -473,9 +477,14 @@ BEGIN
         v_subtotal_qty := 0;
         v_subtotal_rev := 0;
 
-        DBMS_OUTPUT.PUT_LINE('METHOD: ' || v_pay_method_name);
+        DBMS_OUTPUT.PUT_LINE(CHR(10) || ' [ METHOD: ' || UPPER(v_pay_method_name) || ' ]');
         DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-        DBMS_OUTPUT.PUT_LINE(RPAD('PAY_ID', 10) || RPAD('REF_NO', 20) || RPAD('PAID_AT', 20) || LPAD('AMOUNT', 20));
+        DBMS_OUTPUT.PUT_LINE(
+            RPAD('  ID', v_col1_w) ||
+            RPAD('REFERENCE NO.', v_col2_w) ||
+            RPAD('PAY DATE', v_col3_w) ||
+            LPAD('AMOUNT(RM)', v_col4_w)
+        );
         DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
         OPEN payDetailCursor;
@@ -484,48 +493,58 @@ BEGIN
             EXIT WHEN payDetailCursor%NOTFOUND;
 
             DBMS_OUTPUT.PUT_LINE(
-                RPAD(payRec.ID, 10) ||
-                RPAD(payRec.REF_NO, 20) ||
-                RPAD(TO_CHAR(payRec.PAID_AT, 'YYYY-MM-DD'), 20) ||
-                LPAD(TO_CHAR(payRec.AMOUNT, '$99,990.00'), 20)
+                '  ' || RPAD(payRec.ID, v_col1_w - 2) ||
+                RPAD(payRec.REF_NO, v_col2_w) ||
+                RPAD(TO_CHAR(payRec.PAID_AT, 'YYYY-MM-DD'), v_col3_w) ||
+                LPAD(TO_CHAR(payRec.AMOUNT, '99,990.00'), v_col4_w)
             );
 
             v_subtotal_qty := v_subtotal_qty + 1;
             v_subtotal_rev := v_subtotal_rev + payRec.AMOUNT;
         END LOOP;
 
-        IF v_subtotal_qty > v_max_qty THEN
+        IF v_subtotal_qty > v_max_qty AND v_subtotal_qty > 0 THEN
             v_max_qty := v_subtotal_qty;
             v_best_method := v_pay_method_name;
         END IF;
 
         IF payDetailCursor%ROWCOUNT > 0 THEN
-            DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-            DBMS_OUTPUT.PUT_LINE(RPAD('SUB TOTAL (' || v_pay_method_name || ')', 30) ||
-                                 'COUNT: ' || RPAD(v_subtotal_qty, 13) ||
-                                 LPAD(TO_CHAR(v_subtotal_rev, '$99,990.00'), 20));
+            DBMS_OUTPUT.PUT_LINE(RPAD('.', v_line_width, '.'));
+            DBMS_OUTPUT.PUT_LINE(
+                RPAD('  Subtotal for ' || v_pay_method_name, v_col1_w + v_col2_w) ||
+                'Qty: ' || RPAD(v_subtotal_qty, v_col3_w - 5) ||
+                LPAD(TO_CHAR(v_subtotal_rev, '99,990.00'), v_col4_w)
+            );
         ELSE
-            DBMS_OUTPUT.PUT_LINE('** NO TRANSACTIONS THIS MONTH **');
+            DBMS_OUTPUT.PUT_LINE('  >> No transactions recorded for this method.');
         END IF;
-        DBMS_OUTPUT.PUT_LINE(CHR(5));
+
+        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+
         v_grand_total_qty := v_grand_total_qty + v_subtotal_qty;
         v_grand_total_rev := v_grand_total_rev + v_subtotal_rev;
-        DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+
         CLOSE payDetailCursor;
     END LOOP;
+    CLOSE payMetTypeCursor;
 
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-
-    DBMS_OUTPUT.PUT_LINE(RPAD('MOST USED METHOD', 45) || ' : ' || LPAD(v_best_method || ' ' || v_max_qty || ' times', 22));
+    DBMS_OUTPUT.PUT_LINE(CHR(10) || RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(RPAD('  FINAL SUMMARY', v_line_width));
     DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
-    DBMS_OUTPUT.PUT_LINE(RPAD('GRAND TOTAL TRANSACTIONS', 45) || ' : ' || LPAD(v_grand_total_qty, 22));
-    DBMS_OUTPUT.PUT_LINE(RPAD('GRAND TOTAL REVENUE', 45) || ' : ' || LPAD(TO_CHAR(v_grand_total_rev, '$99,990.00'), 22));
-    DBMS_OUTPUT.PUT_LINE(LPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD(' ', 50) || '*** END OF REPORT ***');
+    DBMS_OUTPUT.PUT_LINE(RPAD('  Most Popular Method', 30) || ' : ' || v_best_method ||
+        CASE WHEN v_max_qty > 0 THEN ' (' || v_max_qty || ' txns)' ELSE '' END);
 
-    CLOSE payMetTypeCursor;
+    DBMS_OUTPUT.PUT_LINE(RPAD('  Total Transaction Count', 30) || ' : ' || v_grand_total_qty);
+
+    DBMS_OUTPUT.PUT_LINE(RPAD('  Total Monthly Revenue', 30) || ' : ' ||
+        'RM ' || LTRIM(TO_CHAR(v_grand_total_rev, '999,990.00')));
+
+    DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE(LPAD('*** END OF REPORT ***', (v_line_width + 21)/2));
+
 END;
+/
 
 --EXEC monthly_payment_method_summary_report(2029, 1);
 

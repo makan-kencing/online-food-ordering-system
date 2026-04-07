@@ -24,6 +24,7 @@ create trigger trg_autogenerate_ref_no
         :new.ref_no :='REF' || to_char(current_date, 'yyyymmdd') || lpad(seq_daily_ref_no.nextval, 4, '0');
     end;
 /
+
 CREATE OR REPLACE PROCEDURE reset_daily_payment_ref AS
 BEGIN
 

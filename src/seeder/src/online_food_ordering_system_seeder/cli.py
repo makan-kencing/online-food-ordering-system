@@ -3,7 +3,7 @@ import logging
 import click
 from sqlalchemy import create_engine
 
-from online_food_ordering_system_seeder import common
+from online_food_ordering_system_seeder import common, factories
 from online_food_ordering_system_seeder.commands import Seeder
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,14 @@ def seed(host: str, port: int, sid: str, username: str, password: str) -> None:
     common.Session.configure(bind=engine)
     session = common.Session()
     with Seeder(session) as seeder:
+        factories.MemberWithAddressFactory.create_batch(100)
+        seeder.refresh_cache()
         seeder.seed_memberships()
+        seeder.refresh_cache()
         seeder.seed_vouchers()
+        seeder.refresh_cache()
+        seeder.seed_prices()
+        seeder.refresh_cache()
         seeder.seed_orders()
 
 

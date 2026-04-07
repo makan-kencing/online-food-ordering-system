@@ -31,7 +31,6 @@ class Seeder:
             models.Member: self.session.scalars(select(models.Member)
                                                 .options(joinedload(models.Member.addresses),
                                                          joinedload(models.Member.subscriptions),
-                                                         joinedload(models.Member.orders),
                                                          joinedload(models.Member.vouchers))).unique().all(),
             models.PaymentMethod: self.session.scalars(select(models.PaymentMethod)).all(),
             models.Membership: self.session.scalars(select(models.Membership)).all(),
@@ -120,7 +119,7 @@ class Seeder:
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -163,7 +162,7 @@ class Seeder:
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -205,7 +204,7 @@ class Seeder:
                            (models.PriceComponent.vendor_id == order.delivery.vendor_id)
                            if order.delivery is not None else literal(False)))
             .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.order_value, isouter=True)
@@ -250,8 +249,7 @@ class Seeder:
                                 if subscription is not None else literal(False))))
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
-            .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -302,8 +300,7 @@ class Seeder:
                                 if subscription is not None else literal(False))))
             .where(models.PriceComponent.order_value_id.is_(expression.Null()))  # for order only
             .where(models.PriceComponent.vendor_id.is_(expression.Null()))  # for order only
-            .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.quantity_break, isouter=True)
@@ -355,8 +352,7 @@ class Seeder:
             .where(if_then(models.PriceComponent.vendor_id.is_not(expression.Null()),
                            (models.PriceComponent.vendor_id == order.delivery.vendor_id)
                            if order.delivery is not None else literal(False)))
-            .where(models.PriceComponent.voucher_id.is_(expression.Null()))  # not handled here
-            .where(literal(self.now).between(
+            .where(literal(order.ordered_at).between(
                 models.PriceComponent.from_date,
                 func.coalesce(models.PriceComponent.thru_date, func.now())))
             .join(models.PriceComponent.order_value, isouter=True)
@@ -404,6 +400,7 @@ class Seeder:
             order.delivery = delivery
 
         vouchers: list[models.VoucherDistribution] = []
+        feedback_time = order.ordered_at + timedelta(minutes=30, seconds=random.randint(0, 3600))
 
         stmt = select(models.MenuItem) \
             .options(contains_eager(models.MenuItem.product),
@@ -420,9 +417,9 @@ class Seeder:
             .join(models.ProductFeatureGroup.fields) \
             .join(models.ProductFeatureGroupField.product_feature)
         menu_items = self.session.scalars(stmt).unique().all()
-        for menu_item in random.sample(menu_items, k=random.randint(1, max(len(menu_items) // 3, 1))):
+        for menu_item in random.sample(menu_items, k=max(int(random.random() ** 4 * len(menu_items)), 1)):
             product = menu_item.product
-            quantity = random.randint(1, 3)
+            quantity = random.choices((1, 2, 3), k=1, weights=[0.8, 0.15, 0.05])[0]
 
             order_item = models.OrderItem(
                 order=order,
@@ -469,6 +466,23 @@ class Seeder:
                         if voucher:
                             vouchers.append(voucher)
 
+            if random.randint(1, 10):
+                feedback = models.Feedback(
+                    order=order,
+                    order_item=order_item,
+                    rating=random.randint(1, 10),
+                    content=" ".join(self.faker.sentences(2)) if random.randint(1, 2) == 1 else "",
+                    created_at=feedback_time,
+                )
+                n = max(random.randint(1, 8) - 5, 0)
+                for _ in range(n):
+                    feedback.images.add(models.FeedbackImage(
+                        feedback=feedback,
+                        image_url=self.faker.image_url(),
+                        uploaded_at=feedback.created_at
+                    ))
+                order.feedbacks.add(feedback)
+
         self._add_order_surcharges(order)
         if random.randint(1, 2) == 1:
             voucher = self._apply_first_order_voucher(order, member)
@@ -494,6 +508,22 @@ class Seeder:
             voucher.redemption.invoice = invoice
             invoice.vouchers.add(voucher.redemption)
         order.invoice = invoice
+
+        if random.randint(1, 10):
+            feedback = models.Feedback(
+                order=order,
+                rating=random.randint(1, 10),
+                content=" ".join(self.faker.sentences(2)) if random.randint(1, 3) == 1 else "",
+                created_at=feedback_time,
+            )
+            n = max(random.randint(1, 8) - 5, 0)
+            for _ in range(n):
+                feedback.images.add(models.FeedbackImage(
+                    feedback=feedback,
+                    image_url=self.faker.image_url(),
+                    uploaded_at=feedback.created_at
+                ))
+            order.feedbacks.add(feedback)
 
         return order
 
@@ -531,8 +561,6 @@ class Seeder:
                 member.subscriptions.add(subscription)
                 current_dt += timedelta(days=30)
 
-        self.session.commit()
-
     def seed_vouchers(self) -> None:
         def distribute_randomly(voucher: models.Voucher) -> None:
             for member in random.choices(self.tables[models.Member], k=voucher.usage_limit + random.randint(-100, 100)):
@@ -545,7 +573,7 @@ class Seeder:
             return models.Voucher(
                 name=name,
                 description=description,
-                usage_limit=random.randint(100, 500),
+                usage_limit=random.randint(20, 200),
                 from_date=day,
                 thru_date=day + timedelta(days=random.randint(10, 31)),
                 created_by_id=created_by_id
@@ -564,13 +592,12 @@ class Seeder:
             )
 
         for restaurant in tqdm(self.tables[models.Restaurant], desc="Picking restaurants"):
-
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
             for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Creating vouchers"), start=1):
                 if random.randint(1, 2) == 1:
-                    value = Decimal(f"0.{random.randint(1, 10)}")
+                    value = Decimal(f"0.{random.randint(1, 10):02}")
                 else:
-                    value = Decimal(random.choice((5, 10, 25)))
+                    value = Decimal(random.choice((2, 3, 5)))
                 match random.randint(1, 7):
                     case 1 | 2 | 3:
                         product = self.session.scalars(
@@ -626,8 +653,6 @@ class Seeder:
                 voucher.priced.add(price)  # noqa
                 distribute_randomly(voucher)
                 self.session.add(voucher)
-
-        self.session.commit()
 
     def seed_prices(self) -> None:
         products = self.session.scalars(select(models.Product)).all()
@@ -704,12 +729,12 @@ class Seeder:
                 if thru_dt is None:
                     break
                 from_dt: datetime = thru_dt
-        self.session.commit()
 
     def seed_orders(self) -> None:
         for member in tqdm(self.tables[models.Member], desc="Picking members"):
+            affinity = random.randint(3, 30)
             days = pl.date_range(start=member.created_at, end=self.now, interval="1d", eager=True)
-            for day in tqdm(days.sample(fraction=1 / 3).sort(), desc="Creating order"):
+            for day in tqdm(days.sample(fraction=1 / affinity).sort(), desc="Creating order"):
                 restaurant = random.choice(self.tables[models.Restaurant])
                 day = self.faker.date_time_between(
                     start_date=datetime.combine(day, (datetime.min + restaurant.opening_hour).time()),
@@ -717,6 +742,4 @@ class Seeder:
                 )
 
                 orders = self._create_order(member, restaurant, day)
-                member.orders.add(orders)
-
-        self.session.commit()
+                self.session.add(orders)
