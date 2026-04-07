@@ -385,7 +385,7 @@ class Seeder:
     def _create_order(self, member: models.Member, restaurant: models.Restaurant,
                       order_time: datetime) -> models.Orders:
         order = models.Orders(
-            member_id=member.id,
+            member=member,
             ordered_at=order_time,
             order_type=random.choice((models.Orders.OrderType.DELIVERY, models.Orders.OrderType.PICKUP))
         )
