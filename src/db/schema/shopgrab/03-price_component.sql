@@ -75,7 +75,7 @@ create trigger trg_validate_price_component_type
     on price_component
     for each row
 begin
-    if :new.price_type = price_type.BASE
+    if :new.price_type = 1
     then
         if coalesce(:new.product_id, :new.product_feature_id) is null or :new.amount is null
         then
@@ -83,17 +83,17 @@ begin
         end if;
     end if;
 
-    if coalesce(:new.product_id, :new.product_feature_id) and :new.order_value_id is not null
+    if coalesce(:new.product_id, :new.product_feature_id) is not null and :new.order_value_id is not null
     then
         raise_application_error(-20300, 'Order value is not compatible with product or a product feature');
     end if;
 
-    if coalesce(:new.product_id, :new.product_feature_id) and :new.vendor_id is not null
+    if coalesce(:new.product_id, :new.product_feature_id) is not null and :new.vendor_id is not null
     then
         raise_application_error(-20300, 'Delivery vendor is not compatible with product or a product feature');
     end if;
 
-    if not coalesce(:new.product_id, :new.product_feature_id) and :new.quantity_break_id is not null
+    if not coalesce(:new.product_id, :new.product_feature_id) is not null and :new.quantity_break_id is not null
     then
         raise_application_error(-20300, 'Quantity break has to be bound with product or a product feature');
     end if;

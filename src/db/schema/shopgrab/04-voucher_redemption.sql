@@ -56,7 +56,7 @@ create trigger t_check_voucher_can_change_usage_limit
     on voucher
     for each row
 declare
-    v_number_of_redeems boolean;
+    v_number_of_redeems int;
     voucher_insufficient exception;
     pragma exception_init ( voucher_insufficient, -4096 );
 begin
@@ -73,7 +73,7 @@ exception
     when voucher_insufficient then
         raise_application_error(
                 -20300,
-                'Cannot set limit from ' || old.usage_limit || ' to ' || new.usage_limit || ' ' ||
+                'Cannot set limit from ' || :old.usage_limit || ' to ' || :new.usage_limit || ' ' ||
                 'when ' || v_number_of_redeems || ' is in use.'
         );
 end;

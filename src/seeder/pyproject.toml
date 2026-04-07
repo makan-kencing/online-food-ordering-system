@@ -12,6 +12,7 @@ dependencies = [
     "faker",
     "factory-boy",
     "ipykernel",
+    "tqdm"
 ]
 
 [project.scripts]
