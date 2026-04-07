@@ -109,7 +109,7 @@ class Seeder:
             .where(if_then(models.PriceComponent.quantity_break_id.is_not(expression.Null()),
                            literal(order_item.quantity).between(
                                models.QuantityBreak.from_quantity,
-                               func.coalesce(models.QuantityBreak.thru_quantity))))
+                               func.coalesce(models.QuantityBreak.thru_quantity, 9999))))
             .where(if_then(models.PriceComponent.restaurant_id.is_not(expression.Null()),
                            and_(models.PriceComponent.product_id.is_not(expression.Null()),
                                 models.PriceComponent.restaurant_id == order.restaurant_id)))
@@ -152,7 +152,7 @@ class Seeder:
             .where(if_then(models.PriceComponent.quantity_break_id.is_not(expression.Null()),
                            literal(order_item_feature.quantity).between(
                                models.QuantityBreak.from_quantity,
-                               func.coalesce(models.QuantityBreak.thru_quantity))))
+                               func.coalesce(models.QuantityBreak.thru_quantity, 9999))))
             .where(if_then(models.PriceComponent.restaurant_id.is_not(expression.Null()),
                            and_(models.PriceComponent.product_id.is_not(expression.Null()),
                                 models.PriceComponent.restaurant_id == order.restaurant_id)))
@@ -240,7 +240,7 @@ class Seeder:
             .where(if_then(models.PriceComponent.quantity_break_id.is_not(expression.Null()),
                            literal(order_item.quantity).between(
                                models.QuantityBreak.from_quantity,
-                               func.coalesce(models.QuantityBreak.thru_quantity))))
+                               func.coalesce(models.QuantityBreak.thru_quantity, 9999))))
             .where(if_then(models.PriceComponent.restaurant_id.is_not(expression.Null()),
                            and_(models.PriceComponent.product_id.is_not(expression.Null()),
                                 models.PriceComponent.restaurant_id == order.restaurant_id)))
@@ -292,7 +292,7 @@ class Seeder:
             .where(if_then(models.PriceComponent.quantity_break_id.is_not(expression.Null()),
                            literal(order_item_feature.quantity).between(
                                models.QuantityBreak.from_quantity,
-                               func.coalesce(models.QuantityBreak.thru_quantity))))
+                               func.coalesce(models.QuantityBreak.thru_quantity, 9999))))
             .where(if_then(models.PriceComponent.restaurant_id.is_not(expression.Null()),
                            and_(models.PriceComponent.product_id.is_not(expression.Null()),
                                 models.PriceComponent.restaurant_id == order.restaurant_id)))
@@ -387,7 +387,8 @@ class Seeder:
         order = models.Orders(
             member=member,
             ordered_at=order_time,
-            order_type=random.choice((models.Orders.OrderType.DELIVERY, models.Orders.OrderType.PICKUP))
+            order_type=random.choice((models.Orders.OrderType.DELIVERY, models.Orders.OrderType.PICKUP)),
+            restaurant=restaurant
         )
         if order.order_type == models.Orders.OrderType.DELIVERY:
             delivery = models.Delivery(
