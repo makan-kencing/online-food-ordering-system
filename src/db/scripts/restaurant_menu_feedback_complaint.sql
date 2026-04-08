@@ -321,120 +321,130 @@ commit;
 -- EXEC proc_menu_detailed_report(1);    //display restaurant revenue
 
 -- Report - 2
--- Product feedback detailed report, can choose to display all product or display specific product
-CREATE OR REPLACE PROCEDURE proc_feedback_by_product (
-    p_product_id IN NUMBER DEFAULT NULL
+-- Display a restaurant feedback by menu item group
+CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_by_restaurant (
+    p_restaurant_id IN NUMBER
 ) IS
-    v_line_width CONSTANT NUMBER := 120;  
-    v_feedback_count NUMBER;
-    v_product_exists NUMBER;
+    v_line_width CONSTANT NUMBER := 120;
+    v_restaurant_exists NUMBER;
 
-    CURSOR cur_products IS
-        SELECT id, name
-        FROM product
-        WHERE p_product_id IS NULL OR id = p_product_id
-        ORDER BY name;
+    v_max_feedback NUMBER := 0;
+    v_max_rating NUMBER := 0;
 
-    CURSOR cur_feedback (p_product NUMBER) IS
-        SELECT f.rating, f.content, f.status
-        FROM feedback f
-                 JOIN order_item oi ON f.order_item_id = oi.id
-        WHERE oi.product_id = p_product;
+    v_most_feedback_items VARCHAR2(1000) := '';
+    v_highest_rating_items VARCHAR2(1000) := '';
 
-    rec_product cur_products%ROWTYPE;
-    rec_feedback cur_feedback%ROWTYPE;
-    v_first_row BOOLEAN;
+    CURSOR cur_groups IS
+        SELECT DISTINCT mig.id, mig.name
+        FROM menu_item mi
+                 JOIN menu_item_group mig ON mi.group_id = mig.id
+        WHERE mi.restaurant_id = p_restaurant_id
+        ORDER BY mig.name;
+
+    rec_group cur_groups%ROWTYPE;
+
+    CURSOR cur_items(p_group_id NUMBER) IS
+        SELECT p.name AS item_name,
+               ROUND(AVG(f.rating),2) AS avg_rating,
+               COUNT(f.id) AS feedback_count
+        FROM menu_item mi
+                 JOIN product p ON mi.product_id = p.id
+                 JOIN order_item oi ON oi.product_id = p.id
+                 JOIN orders o ON oi.order_id = o.id
+                 JOIN feedback f ON f.order_item_id = oi.id
+        WHERE mi.restaurant_id = p_restaurant_id
+          AND mi.group_id = p_group_id
+        GROUP BY p.name
+        ORDER BY p.name;
+
+    rec_item cur_items%ROWTYPE;
 
 BEGIN
-    IF p_product_id IS NOT NULL THEN
-        SELECT COUNT(*) INTO v_product_exists
-        FROM product
-        WHERE id = p_product_id;
+    IF p_restaurant_id IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20000,
+                                'Restaurant ID parameter is required.');
+    END IF;
 
-        IF v_product_exists = 0 THEN
-            RAISE_APPLICATION_ERROR(-20001, 'Product not found for ID ' || p_product_id);
-        END IF;
+    SELECT COUNT(*) INTO v_restaurant_exists
+    FROM restaurant
+    WHERE id = p_restaurant_id;
 
-        SELECT COUNT(*) INTO v_feedback_count
-        FROM feedback f
-                 JOIN order_item oi ON f.order_item_id = oi.id
-        WHERE oi.product_id = p_product_id;
-
-        IF v_feedback_count = 0 THEN
-            RAISE_APPLICATION_ERROR(-20002, 'No feedback found for product ID ' || p_product_id);
-        END IF;
+    IF v_restaurant_exists = 0 THEN
+        RAISE_APPLICATION_ERROR(-20001,
+                                'Restaurant not found for ID ' || p_restaurant_id);
     END IF;
 
     -- Header
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('FEEDBACK REPORT BY PRODUCT', v_line_width/2 + 12));
+    DBMS_OUTPUT.PUT_LINE(LPAD('FEEDBACK SUMMARY BY MENU ITEM GROUP',
+                              v_line_width/2 + 17, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 
     DBMS_OUTPUT.PUT_LINE(
-            RPAD('ITEM NAME', 40) ||  
-            RPAD('RATING', 10) ||
-            RPAD('REMARKS', 50) ||
-            RPAD('STATUS', 20)
+            RPAD('GROUP NAME',30) ||
+            RPAD('MENU ITEM',40) ||
+            RPAD('AVG RATING',15) ||
+            RPAD('FEEDBACK COUNT',15)
     );
+
     DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
-    OPEN cur_products;
+    OPEN cur_groups;
     LOOP
-        FETCH cur_products INTO rec_product;
-        EXIT WHEN cur_products%NOTFOUND;
+        FETCH cur_groups INTO rec_group;
+        EXIT WHEN cur_groups%NOTFOUND;
 
-        SELECT COUNT(*) INTO v_feedback_count
-        FROM feedback f
-                 JOIN order_item oi ON f.order_item_id = oi.id
-        WHERE oi.product_id = rec_product.id;
+        DBMS_OUTPUT.PUT_LINE(RPAD(rec_group.name,30) || RPAD('',90));
 
-        IF v_feedback_count = 0 THEN
-            CONTINUE;
-        END IF;
-
-        v_first_row := TRUE;
-
-        OPEN cur_feedback(rec_product.id);
+        OPEN cur_items(rec_group.id);
         LOOP
-            FETCH cur_feedback INTO rec_feedback;
-            EXIT WHEN cur_feedback%NOTFOUND;
+            FETCH cur_items INTO rec_item;
+            EXIT WHEN cur_items%NOTFOUND;
 
-            IF v_first_row THEN
-                DBMS_OUTPUT.PUT_LINE(
-                        RPAD(rec_product.name, 40) ||  
-                        RPAD(rec_feedback.rating, 10) ||
-                        RPAD(NVL(rec_feedback.content, 'N/A'), 50) ||
-                        RPAD(rec_feedback.status, 20)
-                );
-                v_first_row := FALSE;
-            ELSE
-                DBMS_OUTPUT.PUT_LINE(
-                        RPAD('‎ ', 40) ||
-                        RPAD(rec_feedback.rating, 10) ||
-                        RPAD(NVL(rec_feedback.content, 'N/A'), 50) ||
-                        RPAD(rec_feedback.status, 20)
-                );
+            DBMS_OUTPUT.PUT_LINE(
+                    RPAD('‎',30) ||
+                    RPAD(rec_item.item_name,40) ||
+                    RPAD(rec_item.avg_rating,15) ||
+                    RPAD(rec_item.feedback_count,15)
+            );
+
+            IF rec_item.feedback_count > v_max_feedback THEN
+                v_max_feedback := rec_item.feedback_count;
+                v_most_feedback_items := rec_item.item_name || '(' || rec_item.feedback_count || ')';
+            ELSIF rec_item.feedback_count = v_max_feedback THEN
+                v_most_feedback_items := v_most_feedback_items || ', ' ||
+                                         rec_item.item_name || '(' || rec_item.feedback_count || ')';
+            END IF;
+
+            IF rec_item.avg_rating > v_max_rating THEN
+                v_max_rating := rec_item.avg_rating;
+                v_highest_rating_items := rec_item.item_name || '(' || rec_item.avg_rating || ')';
+            ELSIF rec_item.avg_rating = v_max_rating THEN
+                v_highest_rating_items := v_highest_rating_items || ', ' ||
+                                          rec_item.item_name || '(' || rec_item.avg_rating || ')';
             END IF;
 
         END LOOP;
-        CLOSE cur_feedback;
+        CLOSE cur_items;
 
-        DBMS_OUTPUT.PUT_LINE('‎ ‎ ‎ ‎ ‎ ');  -- empty line between products
-
+        DBMS_OUTPUT.PUT_LINE('‎'); -- blank line between groups
     END LOOP;
-    CLOSE cur_products;
+    CLOSE cur_groups;
 
-    --  footer
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+    DBMS_OUTPUT.PUT_LINE('Most Feedback Item : ' || v_most_feedback_items);
+    DBMS_OUTPUT.PUT_LINE('Highest Rated Item : ' || v_highest_rating_items);
+
+    -- Footer
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('END OF REPORT', v_line_width/2 + 6));
+    DBMS_OUTPUT.PUT_LINE(LPAD('END OF REPORT', v_line_width/2 + 6, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 
 END;
 /
 
--- EXEC proc_feedback_by_product;      //display all product with feedback
--- EXEC proc_feedback_by_product(5);   //display specific product
--- EXEC proc_feedback_by_product(1);   //product with no feedback
+-- EXEC proc_feedback_menu_item_by_restaurant(5);   //display specific restaurant
+-- EXEC proc_feedback_menu_item_by_restaurant(0);   //display invalid restaurant
 
 commit;
 -- =========================
