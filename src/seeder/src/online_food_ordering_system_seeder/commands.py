@@ -11,7 +11,6 @@ from sqlalchemy.sql import expression, func, or_, and_
 from tqdm import tqdm
 
 from online_food_ordering_system_seeder import models
-from online_food_ordering_system_seeder.models import Product
 
 
 def if_then(p, *q) -> ColumnElement[bool]:
@@ -587,7 +586,8 @@ class Seeder:
 
     def seed_vouchers(self) -> None:
         def distribute_randomly(voucher: models.Voucher) -> None:
-            for member in random.choices(self.tables[models.Member], k=voucher.usage_limit + random.randint(-100, 100)):
+            limit = voucher.usage_limit or random.randint(20, 100)
+            for member in random.choices(self.tables[models.Member], k=limit + random.randint(-100, 100)):
                 voucher.distributed_to.add(models.VoucherDistribution(
                     member=member,
                     voucher=voucher
@@ -597,7 +597,7 @@ class Seeder:
             return models.Voucher(
                 name=name,
                 description=description,
-                usage_limit=random.randint(20, 200),
+                usage_limit=random.randint(20, 100) if random.randint(0, 1) == 1 else None,
                 from_date=day,
                 thru_date=day + timedelta(days=random.randint(10, 31)),
                 created_by_id=created_by_id
