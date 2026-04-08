@@ -92,6 +92,7 @@ create package voucher_utils as
         p_pricing in price_conditions_t
     );
 end voucher_utils;
+/
 
 create package body voucher_utils as
     procedure create_basic_voucher(
@@ -208,13 +209,72 @@ end;
 /
 
 
-create procedure proc_2() as
-
-begin
-
-end;
+create package price_utils as
+    procedure proc_deduplicate_quantity_breaks_and_order_values;
+end price_utils;
 /
 
+create package body price_utils as
+    procedure proc_deduplicate_quantity_breaks_and_order_values as
+        cursor duplicate_quantity_break_cur is
+            select qb.id as id, keep.id as keep_id
+            from quantity_break qb
+                     join (select min(id) as id, from_quantity, thru_quantity
+                           from quantity_break
+                           group by from_quantity, thru_quantity) keep
+                          on keep.id != qb.id and
+                             keep.from_quantity = qb.from_quantity
+                              and decode(keep.thru_quantity, qb.thru_quantity, 1, 0);
+        cursor duplicate_order_value_cur is
+            select qb.id as id, keep.id as keep_id
+            from order_value qb
+                     join (select min(id) as id, from_amount, thru_amount
+                           from order_value
+                           group by from_amount, thru_amount) keep
+                          on keep.id != qb.id and keep.from_amount = qb.from_amount
+                              and decode(keep.thru_amount, qb.thru_amount, 1, 0);
+        type duplicate_row_t is record (id int, keep_id int);
+        duplicate_row duplicate_row_t;
+    begin
+        open duplicate_quantity_break_cur;
+
+        loop
+            fetch duplicate_quantity_break_cur into duplicate_row;
+            exit when duplicate_quantity_break_cur%notfound;
+
+            update price_component
+            set quantity_break_id = duplicate_row.keep_id
+            where quantity_break_id = duplicate_row.id;
+
+            delete quantity_break
+            where id = duplicate_row.id;
+        end loop;
+
+        close duplicate_quantity_break_cur;
+
+        open duplicate_order_value_cur;
+
+        loop
+            fetch duplicate_order_value_cur into duplicate_row;
+            exit when duplicate_order_value_cur%notfound;
+
+            update price_component
+            set order_value_id = duplicate_row.keep_id
+            where order_value_id = duplicate_row.id;
+
+            delete order_value
+            where id = duplicate_row.id;
+        end loop;
+
+        close duplicate_order_value_cur;
+    end;
+end price_utils;
+/
+
+begin
+    price_utils.proc_deduplicate_quantity_breaks_and_order_values();
+end;
+/
 
 create procedure report_() as
 
