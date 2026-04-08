@@ -1,0 +1,87 @@
+CREATE VIEW V_VOUCHER_STATISTICS AS
+SELECT V.ID,
+       V.NAME,
+       V.DESCRIPTION,
+       V.FROM_DATE,
+       V.THRU_DATE,
+       V.USAGE_LIMIT,
+       COUNT(VD.ID)                                                            "DISTRIBUTED",
+       COUNT(VR.INVOICE_ID)                                                    "REDEEMED",
+       DECODE(V.USAGE_LIMIT, NULL, NULL, V.USAGE_LIMIT - COUNT(VR.INVOICE_ID)) "REMAINING"
+FROM VOUCHER V
+         LEFT JOIN VOUCHER_DISTRIBUTION VD ON V.ID = VD.VOUCHER_ID
+         LEFT JOIN VOUCHER_REDEMPTION VR ON VD.ID = VR.VOUCHER_DISTRIBUTION_ID
+GROUP BY V.ID, V.NAME, V.DESCRIPTION, V.FROM_DATE, V.THRU_DATE, V.USAGE_LIMIT;
+
+SELECT *
+FROM V_VOUCHER_STATISTICS
+WHERE TIMESTAMP '2026-03-01 0:0:0' BETWEEN FROM_DATE AND THRU_DATE;
+
+
+CREATE OR REPLACE VIEW V_PRICE_PREVIEW AS
+SELECT P.ID,
+       P.CODE,
+       P.FROM_DATE,
+       P.THRU_DATE,
+       P.PRICE_TYPE "PRICE_TYPE_ID",
+       DOMAIN_DISPLAY(P.PRICE_TYPE) "PRICE_TYPE_NAME",
+       P.DESCRIPTION,
+       CASE WHEN CURRENT_TIMESTAMP < P.FROM_DATE THEN 'Not active'
+            WHEN CURRENT_TIMESTAMP > P.THRU_DATE THEN 'Expired'
+            ELSE CAST(P.THRU_DATE - CURRENT_TIMESTAMP AS INTERVAL DAY(2) TO SECOND(3)) || ' days left'
+       END "STATUS",
+       TRIM(LEADING ',' FROM DECODE(P.PRODUCT_ID, NULL, '', ', Product: ' || P.PRODUCT_ID)
+           || DECODE(P.PRODUCT_FEATURE_ID, NULL, '', ', Product Feature: ' || P.PRODUCT_FEATURE_ID)
+           || DECODE(P.QUANTITY_BREAK_ID, NULL, '', ', Quantity: More than ' || QB.FROM_QUANTITY || DECODE(QB.THRU_QUANTITY, NULL, '', ' to ' || QB.THRU_QUANTITY))
+           || DECODE(P.ORDER_VALUE_ID, NULL, '', ', Order Value: More than ' || OV.FROM_AMOUNT || DECODE(OV.THRU_AMOUNT, NULL, '', ' to ' || OV.THRU_AMOUNT))
+           || DECODE(P.RESTAURANT_ID, NULL, '', ', Restaurant: ' || P.RESTAURANT_ID)
+           || DECODE(P.MEMBERSHIP_ID, NULL, '', ', Membership: ' || P.MEMBERSHIP_ID)
+           || DECODE(P.VOUCHER_ID, NULL, '', ', Voucher: ' || P.VOUCHER_ID)
+           || DECODE(P.VENDOR_ID, NULL, '', ', Vendor: ' || P.VENDOR_ID)) "SCOPE",
+       TRIM(LEADING ' ' FROM DECODE(P.PERCENTAGE, NULL, TO_CHAR(P.AMOUNT, '$999,999.99'), TO_CHAR(P.PERCENTAGE * 100, '99.99') || '%')) "AMOUNT",
+       P.CREATED_BY_ID
+FROM PRICE_COMPONENT P
+         LEFT JOIN QUANTITY_BREAK QB ON P.QUANTITY_BREAK_ID = QB.ID
+         LEFT JOIN ORDER_VALUE OV ON P.ORDER_VALUE_ID = OV.ID;
+
+SELECT *
+FROM V_PRICE_PREVIEW
+WHERE PRICE_TYPE_ID = PRICE_TYPE.DISCOUNT;
+
+
+create procedure proc_1(
+) as
+
+begin
+
+end;
+/
+
+
+create procedure proc_2(
+) as
+
+begin
+
+end;
+/
+
+
+create procedure report_(
+) as
+
+begin
+
+end;
+/
+
+
+create procedure report_check_voucher_performance(
+) as
+
+begin
+
+end;
+/
+
+
