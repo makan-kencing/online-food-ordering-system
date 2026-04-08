@@ -55,32 +55,32 @@ WHERE PRICE_TYPE_ID = PRICE_TYPE.DISCOUNT;
 
 create package voucher_utils as
     type quantity_break_def_t is record
-    (
-        from_quantity quantity_break.from_quantity%type,
-        thru_quantity quantity_break.thru_quantity%type
-    );
+                                 (
+                                     from_quantity quantity_break.from_quantity%type,
+                                     thru_quantity quantity_break.thru_quantity%type
+                                 );
     type order_value_def_t is record
-    (
-        from_amount order_value.from_amount%type,
-        thru_amount order_value.thru_amount%type
-    );
+                              (
+                                  from_amount order_value.from_amount%type,
+                                  thru_amount order_value.thru_amount%type
+                              );
     type basic_voucher_def_t is record
-    (
-        name voucher.name%type,
-        description  restaurant.description%type,
-        usage_limit  voucher.usage_limit%type
-    );
+                                (
+                                    name        voucher.name%type,
+                                    description restaurant.description%type,
+                                    usage_limit voucher.usage_limit%type
+                                );
     type voucher_price_condition_t is record
-    (
-        product_id          price_component.id%type null,
-        product_feature_id  price_component.id%type null,
-        product_category_id price_component.id%type null,
-        restaurant_id       price_component.restaurant_id%type null,
-        quantity_break      quantity_break_def_t null,
-        order_value         order_value_def_t null,
-        membership_id       price_component.membership_id%type null,
-        vendor_id           price_component.vendor_id%type null
-    );
+                                      (
+                                          product_id          price_component.id%type null,
+                                          product_feature_id  price_component.id%type null,
+                                          product_category_id price_component.id%type null,
+                                          restaurant_id       price_component.restaurant_id%type null,
+                                          quantity_break      quantity_break_def_t null,
+                                          order_value         order_value_def_t null,
+                                          membership_id       price_component.membership_id%type null,
+                                          vendor_id           price_component.vendor_id%type null
+                                      );
     type price_conditions_t is table of voucher_price_condition_t;
 
     procedure create_basic_voucher(
@@ -115,76 +115,75 @@ create package body voucher_utils as
 
         declare
             v_quantity_break_id quantity_break.id%type;
-            v_order_value_id order_value.id%type;
+            v_order_value_id    order_value.id%type;
         begin
             for i in 1 .. p_pricing.count
-            loop
-                v_quantity_break_id := null;
-                v_order_value_id := null;
-                begin
-                    select id
-                    into v_quantity_break_id
-                    from quantity_break
-                    where from_quantity = p_pricing(i).quantity_break.from_quantity
-                        and thru_quantity = p_pricing(i).quantity_break.thru_quantity;
+                loop
+                    v_quantity_break_id := null;
+                    v_order_value_id := null;
+                    begin
+                        select id
+                        into v_quantity_break_id
+                        from quantity_break
+                        where from_quantity = p_pricing(i).quantity_break.from_quantity
+                          and thru_quantity = p_pricing(i).quantity_break.thru_quantity;
 
-                    if v_quantity_break_id is null
-                    then
-                        insert into quantity_break (from_quantity, thru_quantity)
-                        values (p_pricing(i).quantity_break.from_quantity,
-                                p_pricing(i).quantity_break.thru_quantity)
-                        returning id into v_quantity_break_id;
-                    end if;
-                exception
-                    when NO_DATA_FOUND then null;
-                end;
+                        if v_quantity_break_id is null
+                        then
+                            insert into quantity_break (from_quantity, thru_quantity)
+                            values (p_pricing(i).quantity_break.from_quantity,
+                                    p_pricing(i).quantity_break.thru_quantity)
+                            returning id into v_quantity_break_id;
+                        end if;
+                    exception
+                        when NO_DATA_FOUND then null;
+                    end;
 
-                begin
-                    select id
-                    into v_order_value_id
-                    from order_value
-                    where from_amount = p_pricing(i).order_value.from_amount
-                        and thru_amount = p_pricing(i).order_value.thru_amount;
+                    begin
+                        select id
+                        into v_order_value_id
+                        from order_value
+                        where from_amount = p_pricing(i).order_value.from_amount
+                          and thru_amount = p_pricing(i).order_value.thru_amount;
 
-                    if v_quantity_break_id is null
-                    then
-                        insert into order_value (from_amount, thru_amount)
-                        values (p_pricing(i).order_value.from_amount,
-                                p_pricing(i).order_value.thru_amount)
-                        returning id into v_order_value_id;
-                    end if;
-                exception
-                    when NO_DATA_FOUND then null;
-                end;
+                        if v_quantity_break_id is null
+                        then
+                            insert into order_value (from_amount, thru_amount)
+                            values (p_pricing(i).order_value.from_amount,
+                                    p_pricing(i).order_value.thru_amount)
+                            returning id into v_order_value_id;
+                        end if;
+                    exception
+                        when NO_DATA_FOUND then null;
+                    end;
 
-                insert into price_component (price_type, from_date, thru_date, description, created_by_id,
-                                             amount, percentage,
-                                             product_id,
-                                             product_feature_id,
-                                             product_category_id,
-                                             quantity_break_id,
-                                             order_value_id,
-                                             restaurant_id,
-                                             membership_id,
-                                             vendor_id,
-                                             voucher_id)
-                values (2,
-                        p_from_date,
-                        p_thru_date,
-                        p_voucher.description,
-                        p_created_by_id,
-                        case when p_discount >= 1 then p_discount end,
-                        case when p_discount < 1 then p_discount end,
-                        p_pricing(i).product_id,
-                        p_pricing(i).product_feature_id,
-                        p_pricing(i).product_category_id,
-                        v_quantity_break_id,
-                        v_order_value_id,
-                        p_pricing(i).restaurant_id,
-                        p_pricing(i).membership_id,
-                        p_pricing(i).vendor_id,
-                        v_voucher_id
-                        );
+                    insert into price_component (price_type, from_date, thru_date, description, created_by_id,
+                                                 amount, percentage,
+                                                 product_id,
+                                                 product_feature_id,
+                                                 product_category_id,
+                                                 quantity_break_id,
+                                                 order_value_id,
+                                                 restaurant_id,
+                                                 membership_id,
+                                                 vendor_id,
+                                                 voucher_id)
+                    values (2,
+                            p_from_date,
+                            p_thru_date,
+                            p_voucher.description,
+                            p_created_by_id,
+                            case when p_discount >= 1 then p_discount end,
+                            case when p_discount < 1 then p_discount end,
+                            p_pricing(i).product_id,
+                            p_pricing(i).product_feature_id,
+                            p_pricing(i).product_category_id,
+                            v_quantity_break_id,
+                            v_order_value_id,
+                            p_pricing(i).restaurant_id,
+                            p_pricing(i).membership_id,
+                            p_pricing(i).vendor_id,
+                            v_voucher_id);
                 end loop;
         end;
     end;
@@ -197,12 +196,13 @@ begin
             TIMESTAMP '2026-04-04 0:0:0',
             TIMESTAMP '2026-04-10 0:0:0',
             1,
-            new voucher_utils.basic_voucher_def_t(name => '4/4 Celebration', description => 'Celebrate 4/4 with 10% off for members or above RM 100'),
+            new voucher_utils.basic_voucher_def_t(name => '4/4 Celebration',
+            description => 'Celebrate 4/4 with 10% off for members or above RM 100'),
             new voucher_utils.price_conditions_t(
-                voucher_utils.voucher_price_condition_t(membership_id => 1),
-                voucher_utils.voucher_price_condition_t(membership_id => 2),
-                voucher_utils.voucher_price_condition_t(order_value => voucher_utils.order_value_def_t(from_amount => 100))
-           )
+            voucher_utils.voucher_price_condition_t(membership_id => 1),
+            voucher_utils.voucher_price_condition_t(membership_id => 2),
+            voucher_utils.voucher_price_condition_t(order_value => voucher_utils.order_value_def_t(from_amount => 100))
+                                                )
     );
 end;
 /
