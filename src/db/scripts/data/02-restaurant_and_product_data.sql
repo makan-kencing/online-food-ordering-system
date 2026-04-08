@@ -317,6 +317,19 @@ VALUES
 ('Maki Rolls', 'Rolled sushi', NULL, 12),
 ('Nigiri', 'Hand pressed', NULL, 12);
 
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Pizzas' AND created_by_id = 1 AND parent IS NULL) WHERE name IN ('Veg Pizzas', 'NonVeg Pizzas') AND created_by_id = 1;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Burgers' AND created_by_id = 2 AND parent IS NULL) WHERE name IN ('Chicken Burgers', 'Beef Burgers') AND created_by_id = 2;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Beverages' AND created_by_id = 3 AND parent IS NULL) WHERE name IN ('Carbonated', 'Juices') AND created_by_id = 3;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Sides' AND created_by_id = 4 AND parent IS NULL) WHERE name IN ('Fries', 'Dips') AND created_by_id = 4;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Pizzas' AND created_by_id = 5 AND parent IS NULL) WHERE name IN ('Premium', 'Classic') AND created_by_id = 5;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Desserts' AND created_by_id = 6 AND parent IS NULL) WHERE name IN ('Ice Cream', 'Cakes') AND created_by_id = 6;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Pizzas' AND created_by_id = 7 AND parent IS NULL) WHERE name IN ('Gluten Free', 'Low Carb') AND created_by_id = 7;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Coffee' AND created_by_id = 8 AND parent IS NULL) WHERE name IN ('Espresso', 'Latte') AND created_by_id = 8;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Pizzas' AND created_by_id = 9 AND parent IS NULL) WHERE name IN ('Specialty', 'Signature') AND created_by_id = 9;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Tea' AND created_by_id = 10 AND parent IS NULL) WHERE name IN ('Iced Tea', 'Herbal Tea') AND created_by_id = 10;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Noodles' AND created_by_id = 11 AND parent IS NULL) WHERE name IN ('Soup Noodles', 'Dry Noodles') AND created_by_id = 11;
+UPDATE product_category SET parent = (SELECT id FROM product_category WHERE name = 'Sushi' AND created_by_id = 12 AND parent IS NULL) WHERE name IN ('Maki Rolls', 'Nigiri') AND created_by_id = 12;
+
 -- 5. PRODUCT (36 records - 3 per restaurant)
 INSERT INTO PRODUCT (CODE, NAME, DESCRIPTION, INTRODUCTION_DATE, IMAGE_URL, CREATED_BY_ID)
 VALUES
@@ -384,6 +397,114 @@ VALUES
 ('R12SUS01', 'California Roll', 'Crab, avocado, cucumber', DATE '2024-12-10', '/images/r12/california.jpg', 12),
 ('R12SUS02', 'Salmon Nigiri', 'Fresh salmon over rice', DATE '2024-12-15', '/images/r12/salmon.jpg', 12),
 ('R12SUS03', 'Dragon Roll', 'Eel, avocado, cucumber', DATE '2024-12-20', '/images/r12/dragon.jpg', 12);
+
+CREATE OR REPLACE FUNCTION get_product_category_id(
+    p_product_code VARCHAR2,
+    p_created_by_id NUMBER
+) RETURN NUMBER IS
+    v_category_id NUMBER;
+BEGIN
+    -- Restaurant 1 - Pizza products
+    IF p_created_by_id = 1 THEN
+        IF p_product_code = 'R1PIZ001' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Veg Pizzas' AND created_by_id = 1;
+        ELSIF p_product_code = 'R1PIZ002' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'NonVeg Pizzas' AND created_by_id = 1;
+        ELSIF p_product_code = 'R1PIZ003' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Veg Pizzas' AND created_by_id = 1;
+        END IF;
+
+        -- Restaurant 2 - Burger products
+    ELSIF p_created_by_id = 2 THEN
+        IF p_product_code = 'R2BRG001' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Beef Burgers' AND created_by_id = 2;
+        ELSIF p_product_code = 'R2BRG002' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Chicken Burgers' AND created_by_id = 2;
+        ELSIF p_product_code = 'R2BRG003' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Beef Burgers' AND created_by_id = 2;
+        END IF;
+
+        -- Restaurant 3 - Beverage products
+    ELSIF p_created_by_id = 3 THEN
+        IF p_product_code = 'R3BEV001' OR p_product_code = 'R3BEV003' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Carbonated' AND created_by_id = 3;
+        ELSIF p_product_code = 'R3BEV002' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Juices' AND created_by_id = 3;
+        END IF;
+
+        -- Restaurant 4 - Side products
+    ELSIF p_created_by_id = 4 THEN
+        IF p_product_code IN ('R4SIDE01', 'R4SIDE02', 'R4SIDE03') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Fries' AND created_by_id = 4;
+        END IF;
+
+        -- Restaurant 5 - Pizza products
+    ELSIF p_created_by_id = 5 THEN
+        IF p_product_code IN ('R5PIZ001', 'R5PIZ002', 'R5PIZ003') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Premium' AND created_by_id = 5;
+        END IF;
+
+        -- Restaurant 6 - Dessert products
+    ELSIF p_created_by_id = 6 THEN
+        IF p_product_code = 'R6DES001' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Ice Cream' AND created_by_id = 6;
+        ELSIF p_product_code = 'R6DES002' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Ice Cream' AND created_by_id = 6;
+        ELSIF p_product_code = 'R6DES003' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Cakes' AND created_by_id = 6;
+        END IF;
+
+        -- Restaurant 7 - Healthy Pizza products
+    ELSIF p_created_by_id = 7 THEN
+        IF p_product_code IN ('R7PIZ001', 'R7PIZ002', 'R7PIZ003') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Gluten Free' AND created_by_id = 7;
+        END IF;
+
+        -- Restaurant 8 - Coffee products
+    ELSIF p_created_by_id = 8 THEN
+        IF p_product_code = 'R8COF001' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Espresso' AND created_by_id = 8;
+        ELSIF p_product_code IN ('R8COF002', 'R8COF003') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Latte' AND created_by_id = 8;
+        END IF;
+
+        -- Restaurant 9 - Classic Pizza products
+    ELSIF p_created_by_id = 9 THEN
+        IF p_product_code IN ('R9PIZ001', 'R9PIZ002', 'R9PIZ003') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Specialty' AND created_by_id = 9;
+        END IF;
+
+        -- Restaurant 10 - Tea products
+    ELSIF p_created_by_id = 10 THEN
+        IF p_product_code IN ('R10TEA01', 'R10TEA02') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Tea' AND created_by_id = 10;
+        ELSIF p_product_code = 'R10TEA03' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Iced Tea' AND created_by_id = 10;
+        END IF;
+
+        -- Restaurant 11 - Noodle products
+    ELSIF p_created_by_id = 11 THEN
+        IF p_product_code IN ('R11NOD01', 'R11NOD02') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Soup Noodles' AND created_by_id = 11;
+        ELSIF p_product_code = 'R11NOD03' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Dry Noodles' AND created_by_id = 11;
+        END IF;
+
+        -- Restaurant 12 - Sushi products
+    ELSIF p_created_by_id = 12 THEN
+        IF p_product_code IN ('R12SUS01', 'R12SUS03') THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Maki Rolls' AND created_by_id = 12;
+        ELSIF p_product_code = 'R12SUS02' THEN
+            SELECT id INTO v_category_id FROM product_category WHERE name = 'Nigiri' AND created_by_id = 12;
+        END IF;
+    END IF;
+
+    RETURN v_category_id;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
+END;
+/
 
 -- 6. PRODUCT_FEATURE_GROUP
 DECLARE
@@ -768,18 +889,13 @@ BEGIN
     SELECT MAX(id) INTO v_max_product_id FROM product;
     SELECT MAX(id) INTO v_max_category_id FROM product_category;
 
-    FOR prod IN (SELECT id, created_by_id FROM product)
+    FOR prod IN (SELECT id, code, created_by_id FROM product)
         LOOP
             v_created_by := prod.created_by_id;
 
-            BEGIN
-                SELECT id
-                INTO v_category_id
-                FROM product_category
-                WHERE created_by_id = v_created_by
-                  AND parent IS NULL
-                  AND ROWNUM = 1;
+            v_category_id := get_product_category_id(prod.code, v_created_by);
 
+            IF v_category_id IS NOT NULL THEN
                 BEGIN
                     INSERT INTO product_category_classification
                     (product_id, product_category_id, from_date, thru_date, is_primary)
@@ -788,80 +904,33 @@ BEGIN
                     v_counter := v_counter + 1;
                 EXCEPTION
                     WHEN DUP_VAL_ON_INDEX THEN
-                        NULL; -- skip if already exists
+                        NULL; 
                 END;
-            EXCEPTION
-                WHEN NO_DATA_FOUND THEN
-                    NULL;
-            END;
 
-            FOR cat IN (SELECT id
-                        FROM product_category
-                        WHERE created_by_id = v_created_by
-                          AND parent IS NOT NULL
-                          AND ROWNUM <= 2)
-                LOOP
-                    BEGIN
-                        INSERT INTO product_category_classification
-                        (product_id, product_category_id, from_date, thru_date, is_primary)
-                        VALUES
-                            (prod.id, cat.id, CURRENT_TIMESTAMP, NULL, FALSE);
-                        v_counter := v_counter + 1;
-                    EXCEPTION
-                        WHEN DUP_VAL_ON_INDEX THEN
-                            NULL;
-                    END;
-                END LOOP;
+                FOR parent_cat IN (
+                    SELECT pc.id
+                    FROM product_category pc
+                    START WITH pc.id = v_category_id
+                    CONNECT BY PRIOR pc.PARENT = pc.id
+                           AND LEVEL > 1
+                    ) LOOP
+                        BEGIN
+                            INSERT INTO product_category_classification
+                            (product_id, product_category_id, from_date, thru_date, is_primary)
+                            VALUES
+                                (prod.id, parent_cat.id, CURRENT_TIMESTAMP, NULL, FALSE);
+                            v_counter := v_counter + 1;
+                        EXCEPTION
+                            WHEN DUP_VAL_ON_INDEX THEN
+                                NULL;
+                        END;
+                    END LOOP;
+            END IF;
         END LOOP;
-
---     FOR i IN 1..200 LOOP
---             DECLARE
---                 v_pid      NUMBER := MOD(i, v_max_product_id) + 1;
---                 v_cid      NUMBER := MOD(i, v_max_category_id) + 1;
---                 v_p_exists NUMBER;
---                 v_c_exists NUMBER;
---             BEGIN
---                 SELECT COUNT(*) INTO v_p_exists FROM product WHERE id = v_pid;
---                 SELECT COUNT(*) INTO v_c_exists FROM product_category WHERE id = v_cid;
---
---                 IF v_p_exists > 0 AND v_c_exists > 0 THEN
---                     BEGIN
---                         INSERT INTO product_category_classification
---                         (product_id, product_category_id, from_date, thru_date, is_primary)
---                         VALUES
---                             (
---                                 v_pid,
---                                 v_cid,
---                                 TO_TIMESTAMP('2023-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
---                                              'YYYY-MM-DD HH24:MI:SS'),
---                                 CASE
---                                     WHEN MOD(i, 3) = 0 THEN
---                                         TO_TIMESTAMP('2024-' || LPAD(MOD(i, 12) + 1, 2, '0') || '-01 10:00:00',
---                                                      'YYYY-MM-DD HH24:MI:SS')
---                                     ELSE NULL
---                                     END,
---                                 CASE
---                                     WHEN NOT EXISTS (
---                                         SELECT 1
---                                         FROM product_category_classification
---                                         WHERE product_id = v_pid
---                                           AND is_primary = TRUE
---                                           AND (thru_date IS NULL OR thru_date > CURRENT_TIMESTAMP)
---                                     )
---                                         THEN TRUE
---                                     ELSE FALSE
---                                     END
---                             );
---                     EXCEPTION
---                         WHEN DUP_VAL_ON_INDEX THEN
---                             NULL;
---                     END;
---                 END IF;
---             END;
---         END LOOP;
 
     DBMS_OUTPUT.PUT_LINE('PRODUCT_CATEGORY_CLASSIFICATION records inserted: ' || v_counter);
 END;
+/
 
 -- 10. MENU_ITEM
 DECLARE
