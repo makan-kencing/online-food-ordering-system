@@ -276,19 +276,248 @@ begin
 end;
 /
 
-create procedure report_() as
-
+create or replace procedure report_product_and_features_price_changes(p_product_id in product.id%type) as
+    cursor product_price_cur is
+        SELECT *
+        FROM PRICE_COMPONENT PC
+        WHERE PC.PRICE_TYPE = 1
+          AND PC.PRODUCT_ID = p_product_id
+        ORDER BY PC.FROM_DATE;
+    product_price_row         product_price_cur%rowtype;
+    cursor product_attributes_cur is
+        SELECT PFG.ID, PFG.NAME, PFG.MIN, PFG.MAX
+        FROM PRODUCT_ATTRIBUTE PA
+                 JOIN PRODUCT_FEATURE_GROUP PFG ON PA.PRODUCT_FEATURE_GROUP_ID = PFG.ID
+        WHERE PA.PRODUCT_ID = p_product_id;
+    product_attributes_row    product_attributes_cur%rowtype;
+    cursor product_features_cur(p_product_feature_group_id PRODUCT_FEATURE_GROUP.ID%type) is
+        SELECT PFGF.PRODUCT_FEATURE_ID
+        FROM PRODUCT_FEATURE_GROUP PFG
+                 JOIN PRODUCT_FEATURE_GROUP_FIELD PFGF ON PFG.ID = PFGF.PRODUCT_FEATURE_GROUP_ID
+        WHERE PFG.ID = p_product_feature_group_id;
+    product_features_row      product_features_cur%rowtype;
+    cursor product_feature_price_cur(p_product_feature_id price_component.PRODUCT_FEATURE_ID%type) is
+        SELECT *
+        FROM PRICE_COMPONENT PC
+        WHERE PC.PRICE_TYPE = 1
+          AND PC.PRODUCT_FEATURE_ID = p_product_feature_id
+          AND (PC.PRODUCT_ID IS NULL OR PC.PRODUCT_ID = 1)
+        ORDER BY PC.FROM_DATE;
+    product_feature_price_row product_feature_price_cur%rowtype;
+    v_name                    VARCHAR(100);
+    v_last_amount             price_component.AMOUNT%type;
+    product_not_found exception;
 begin
+    begin
+        select name into v_name from product where id = p_product_id;
+    exception
+        when NO_DATA_FOUND then raise product_not_found;
+    end;
 
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+    DBMS_OUTPUT.PUT_LINE(CPAD(v_name || ' Price History', 100, ' '));
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+
+    open product_price_cur;
+    v_last_amount := 0;
+    loop
+        fetch product_price_cur into product_price_row;
+        exit when product_price_cur%notfound;
+
+        DBMS_OUTPUT.PUT_LINE(
+                '  ' || TO_CHAR(product_price_row.FROM_DATE, 'DD-Mon-YYYY') || ' - '
+                    || CASE
+                           WHEN product_price_row.THRU_DATE IS NULL
+                               THEN RPAD('Now', 11, ' ')
+                           ELSE TO_CHAR(product_price_row.THRU_DATE, 'DD-Mon-YYYY') END
+                    || '  : RM ' || TRIM(LEADING ' ' FROM TO_CHAR(product_price_row.AMOUNT, '9,999.99'))
+                    || '( ' || case SIGN(product_price_row.AMOUNT - v_last_amount) when 1 then '+' end
+                    || TRIM(LEADING ' ' FROM TO_CHAR(product_price_row.AMOUNT - v_last_amount, '9,999.99')) || ' )');
+        v_last_amount := product_price_row.AMOUNT;
+    end loop;
+    close product_price_cur;
+
+    open product_attributes_cur;
+    loop
+        fetch product_attributes_cur into product_attributes_row;
+        exit when product_attributes_cur%notfound;
+
+        select name into v_name from PRODUCT_FEATURE_GROUP where id = product_attributes_row.ID;
+
+        DBMS_OUTPUT.PUT_LINE(CHR(10));
+        DBMS_OUTPUT.PUT_LINE('  - ' || v_name);
+
+        open product_features_cur(product_attributes_row.ID);
+        loop
+            fetch product_features_cur into product_features_row;
+            exit when product_features_cur%notfound;
+
+            select name into v_name from product_feature where id = product_features_row.PRODUCT_FEATURE_ID;
+
+            DBMS_OUTPUT.PUT_LINE('    - ' || v_name);
+
+            open product_feature_price_cur(product_features_row.PRODUCT_FEATURE_ID);
+            v_last_amount := 0;
+            loop
+                fetch product_feature_price_cur into product_feature_price_row;
+                exit when product_feature_price_cur%notfound;
+
+
+                DBMS_OUTPUT.PUT_LINE(
+                        '       ' || TO_CHAR(product_feature_price_row.FROM_DATE, 'DD-Mon-YYYY') || ' - '
+                            || CASE
+                                   WHEN product_feature_price_row.THRU_DATE IS NULL
+                                       THEN RPAD('Now', 11, ' ')
+                                   ELSE TO_CHAR(product_feature_price_row.THRU_DATE, 'DD-Mon-YYYY') END
+                            || ' : RM ' || TRIM(LEADING ' ' FROM TO_CHAR(product_feature_price_row.AMOUNT, '9,999.99'))
+                            || '( ' || case SIGN(product_feature_price_row.AMOUNT - v_last_amount) when 1 then '+' end
+                            ||
+                        TRIM(LEADING ' ' FROM TO_CHAR(product_feature_price_row.AMOUNT - v_last_amount, '9,999.99')) ||
+                        ' )');
+                v_last_amount := product_feature_price_row.AMOUNT;
+            end loop;
+            close product_feature_price_cur;
+        end loop;
+        close product_features_cur;
+    end loop;
+    close product_attributes_cur;
+
+    DBMS_OUTPUT.PUT_LINE(CHR(10));
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+    DBMS_OUTPUT.PUT_LINE(CPAD('-- End of Price History --', 100, ' '));
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+exception
+    when product_not_found then raise_application_error(-20300, 'Product ' || p_product_id || ' is not found');
 end;
 /
 
-
-create procedure report_check_voucher_performance() as
-
 begin
+    report_product_and_features_price_changes(1);
+end;
 
+create procedure report_top_performing_voucher(p_year in int) as
+    cursor yearly_voucher_cur(year int) is
+        SELECT EXTRACT(MONTH FROM I.INVOICED_AT) AS MONTH, VS.DISTRIBUTED, COUNT(I.ID) AS REDEEMED
+        FROM VOUCHER V
+                 LEFT JOIN VOUCHER_DISTRIBUTION VD ON V.ID = VD.VOUCHER_ID
+                 LEFT JOIN VOUCHER_REDEMPTION VR ON VD.ID = VR.VOUCHER_DISTRIBUTION_ID
+                 LEFT JOIN INVOICE I ON VR.INVOICE_ID = I.ID
+                 JOIN (SELECT EXTRACT(MONTH FROM FROM_DATE) AS MONTH, SUM(DISTRIBUTED) AS DISTRIBUTED
+                       FROM V_VOUCHER_STATISTICS
+                       GROUP BY EXTRACT(MONTH FROM FROM_DATE)) VS ON EXTRACT(MONTH FROM I.INVOICED_AT) = VS.MONTH
+        WHERE EXTRACT(YEAR FROM I.INVOICED_AT) = year
+        GROUP BY EXTRACT(MONTH FROM I.INVOICED_AT), VS.DISTRIBUTED
+        ORDER BY MONTH;
+    yearly_voucher_row  yearly_voucher_cur%rowtype;
+    cursor monthly_voucher_cur(year int, month int) is
+        SELECT V.ID,
+               V.DESCRIPTION,
+               V.FROM_DATE,
+               V.THRU_DATE,
+               VS.DISTRIBUTED,
+               COUNT(I.ID)                                                        AS REDEEMED,
+               DECODE(VS.DISTRIBUTED, 0, 100, COUNT(I.ID) / VS.DISTRIBUTED * 100) AS USAGE_RATE
+        from VOUCHER V
+                 LEFT JOIN VOUCHER_DISTRIBUTION VD ON V.ID = VD.VOUCHER_ID
+                 LEFT JOIN VOUCHER_REDEMPTION VR ON VD.ID = VR.VOUCHER_DISTRIBUTION_ID
+                 LEFT JOIN INVOICE I ON VR.INVOICE_ID = I.ID
+            AND EXTRACT(MONTH FROM I.INVOICED_AT) = month
+            AND EXTRACT(YEAR FROM I.INVOICED_AT) = year
+                 JOIN (SELECT ID, SUM(DISTRIBUTED) AS DISTRIBUTED
+                       FROM V_VOUCHER_STATISTICS
+                       GROUP BY ID) VS ON V.ID = VS.ID
+        GROUP BY V.ID, V.DESCRIPTION, V.FROM_DATE, V.THRU_DATE, VS.DISTRIBUTED
+        ORDER BY REDEEMED IS NOT NULL DESC, REDEEMED DESC;
+    monthly_voucher_row monthly_voucher_cur%rowtype;
+    type summary_t is record (total int, distributed int, redeemed int);
+    v_summary           summary_t;
+begin
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+    DBMS_OUTPUT.PUT_LINE(CPAD(p_year || ' Year Top Voucher Performance', 100, ' '));
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+
+    open yearly_voucher_cur(p_year);
+
+    loop
+        -- noinspection SqlIllegalCursorState
+        fetch yearly_voucher_cur into yearly_voucher_row;
+        exit when yearly_voucher_cur%notfound;
+
+        DBMS_OUTPUT.PUT_LINE(CHR(10) || '[ Month: ' || TO_CHAR(TO_DATE(yearly_voucher_row.MONTH, 'MM'), 'MONTH') ||
+                             ' ]');
+        DBMS_OUTPUT.PUT_LINE(REPEAT('-', 91));
+        DBMS_OUTPUT.PUT_LINE(
+                ' ' || RPAD('ID', 5, ' ') || '  '
+                    || RPAD('Description', 40, ' ') || '  '
+                    || CPAD('Distributed', 12, ' ') || '  '
+                    || CPAD('Redeemed', 12, ' ') || '  '
+                    || CPAD('Usage rate %', 12, ' ')
+        );
+        DBMS_OUTPUT.PUT_LINE(REPEAT('-', 91));
+
+        open monthly_voucher_cur(p_year, yearly_voucher_row.MONTH);
+
+        for i in 1..6
+            loop
+                fetch monthly_voucher_cur into monthly_voucher_row;
+                exit when monthly_voucher_cur%notfound;
+
+                if i = 6
+                then
+                    DBMS_OUTPUT.PUT_LINE(' ...');
+                    continue;
+                end if;
+
+                DBMS_OUTPUT.PUT_LINE(
+                        ' ' || RPAD(monthly_voucher_row.ID, 5, ' ') || '  '
+                            || RPAD(monthly_voucher_row.DESCRIPTION, 40, ' ') || '  '
+                            || CPAD(monthly_voucher_row.DISTRIBUTED, 12, ' ') || '  '
+                            || CPAD(monthly_voucher_row.REDEEMED, 12, ' ') || '  '
+                            || CPAD(TO_CHAR(monthly_voucher_row.USAGE_RATE, '999.99') || '%', 12, ' ')
+                );
+            end loop;
+        close monthly_voucher_cur;
+
+        DBMS_OUTPUT.PUT_LINE(
+                RPAD(' This month', 50, ' ')
+                    || CPAD(yearly_voucher_row.DISTRIBUTED, 12, ' ') || '  '
+                    || CPAD(yearly_voucher_row.REDEEMED, 12, ' ') || '  '
+                    ||
+                CPAD(TO_CHAR(yearly_voucher_row.REDEEMED / yearly_voucher_row.DISTRIBUTED * 100, '999.99') || '%', 12,
+                     ' ')
+        );
+    end loop;
+
+    SELECT VS.TOTAL, VS.DISTRIBUTED, COUNT(I.ID) "REDEMPTION"
+    INTO v_summary
+    FROM VOUCHER V
+             LEFT JOIN VOUCHER_DISTRIBUTION VD ON V.ID = VD.VOUCHER_ID
+             LEFT JOIN VOUCHER_REDEMPTION VR ON VD.ID = VR.VOUCHER_DISTRIBUTION_ID
+             LEFT JOIN INVOICE I ON VR.INVOICE_ID = I.ID AND EXTRACT(YEAR FROM I.INVOICED_AT) = p_year
+             CROSS JOIN (SELECT COUNT(*) AS TOTAL, SUM(DISTRIBUTED) AS "DISTRIBUTED"
+                         FROM V_VOUCHER_STATISTICS
+                         WHERE EXTRACT(YEAR FROM FROM_DATE) = p_year) VS
+    GROUP BY VS.TOTAL, VS.DISTRIBUTED;
+
+    DBMS_OUTPUT.PUT_LINE(CHR(10));
+
+    DBMS_OUTPUT.PUT_LINE(CPAD('Summary', 40, ' '));
+    DBMS_OUTPUT.PUT_LINE(REPEAT('-', 40));
+    DBMS_OUTPUT.PUT_LINE(RPAD('New Vouchers', 20, ' ') || ': ' || v_summary.total);
+    DBMS_OUTPUT.PUT_LINE(RPAD('Total Distributed', 20, ' ') || ': ' || v_summary.distributed);
+    DBMS_OUTPUT.PUT_LINE(RPAD('Total Redeemed', 20, ' ') || ': ' || v_summary.redeemed);
+
+    DBMS_OUTPUT.PUT_LINE(CHR(10));
+
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+    DBMS_OUTPUT.PUT_LINE(CPAD(' -- END OF TOP VOUCHER REPORT --', 100, ' '));
+    DBMS_OUTPUT.PUT_LINE(REPEAT('=', 100));
+
+    close yearly_voucher_cur;
 end;
 /
 
-
+begin
+    report_top_performing_voucher(2025);
+end;
+/
