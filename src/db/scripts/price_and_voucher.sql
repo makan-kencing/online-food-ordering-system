@@ -121,9 +121,8 @@ create package body voucher_utils as
             loop
                 v_quantity_break_id := null;
                 v_order_value_id := null;
-                if p_pricing(i).quantity_break is not null
-                then
-                    select id, from_quantity, thru_quantity
+                begin
+                    select id
                     into v_quantity_break_id
                     from quantity_break
                     where from_quantity = p_pricing(i).quantity_break.from_quantity
@@ -136,11 +135,12 @@ create package body voucher_utils as
                                 p_pricing(i).quantity_break.thru_quantity)
                         returning id into v_quantity_break_id;
                     end if;
-                end if;
+                exception
+                    when NO_DATA_FOUND then null;
+                end;
 
-                if p_pricing(i).order_value is not null
-                then
-                    select id, from_amount, thru_amount
+                begin
+                    select id
                     into v_order_value_id
                     from order_value
                     where from_amount = p_pricing(i).order_value.from_amount
@@ -153,7 +153,9 @@ create package body voucher_utils as
                                 p_pricing(i).order_value.thru_amount)
                         returning id into v_order_value_id;
                     end if;
-                end if;
+                exception
+                    when NO_DATA_FOUND then null;
+                end;
 
                 insert into price_component (price_type, from_date, thru_date, description, created_by_id,
                                              amount, percentage,
@@ -166,7 +168,7 @@ create package body voucher_utils as
                                              membership_id,
                                              vendor_id,
                                              voucher_id)
-                values (1,
+                values (2,
                         p_from_date,
                         p_thru_date,
                         p_voucher.description,
@@ -196,7 +198,7 @@ begin
             TIMESTAMP '2026-04-10 0:0:0',
             1,
             new voucher_utils.basic_voucher_def_t(name => '4/4 Celebration', description => 'Celebrate 4/4 with 10% off for members or above RM 100'),
-            new voucher_utils.voucher_price_condition_t(
+            new voucher_utils.price_conditions_t(
                 voucher_utils.voucher_price_condition_t(membership_id => 1),
                 voucher_utils.voucher_price_condition_t(membership_id => 2),
                 voucher_utils.voucher_price_condition_t(order_value => voucher_utils.order_value_def_t(from_amount => 100))
