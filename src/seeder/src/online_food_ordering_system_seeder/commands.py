@@ -452,7 +452,7 @@ class Seeder:
             )
             order.items.add(order_item)
             self._add_order_item_surcharges(order_item)
-            if random.randint(1, 2) == 1:
+            if random.randint(1, 5) <= 4:
                 voucher = self._apply_first_order_item_voucher(order_item, member)
                 if voucher:
                     vouchers.append(voucher)
@@ -617,7 +617,7 @@ class Seeder:
 
         for restaurant in tqdm(self.tables[models.Restaurant], desc="Picking restaurants"):
             days = pl.date_range(start=restaurant.introduction_date, end=self.now, interval="1d", eager=True)
-            for i, day in enumerate(tqdm(days.sample(fraction=1 / 6).sort(), desc="Creating vouchers"), start=1):
+            for i, day in enumerate(tqdm(days.sample(fraction=1 / 30).sort(), desc="Creating vouchers"), start=1):
                 if random.randint(1, 2) == 1:
                     value = Decimal(f"0.{random.randint(1, 10):02}")
                 else:
