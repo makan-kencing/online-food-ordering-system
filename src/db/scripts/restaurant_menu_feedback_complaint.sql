@@ -327,6 +327,7 @@ CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_by_restaurant (
 ) IS
     v_line_width CONSTANT NUMBER := 120;
     v_restaurant_exists NUMBER;
+    v_restaurant_name VARCHAR2(200);
 
     v_max_feedback NUMBER := 0;
     v_max_rating NUMBER := 0;
@@ -349,9 +350,9 @@ CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_by_restaurant (
                COUNT(f.id) AS feedback_count
         FROM menu_item mi
                  JOIN product p ON mi.product_id = p.id
-                 JOIN order_item oi ON oi.product_id = p.id
-                 JOIN orders o ON oi.order_id = o.id
-                 JOIN feedback f ON f.order_item_id = oi.id
+                 LEFT JOIN order_item oi ON oi.product_id = mi.product_id
+                 LEFT JOIN orders o ON oi.order_id = o.id
+                 LEFT JOIN feedback f ON f.order_item_id = oi.id
         WHERE mi.restaurant_id = p_restaurant_id
           AND mi.group_id = p_group_id
         GROUP BY p.name
@@ -365,20 +366,27 @@ BEGIN
                                 'Restaurant ID parameter is required.');
     END IF;
 
-    SELECT COUNT(*) INTO v_restaurant_exists
+    IF p_restaurant_id IS NOT NULL THEN 
+        SELECT COUNT(*) INTO v_restaurant_exists 
+        FROM restaurant 
+        WHERE id = p_restaurant_id;
+        
+        IF v_restaurant_exists = 0 THEN 
+            RAISE_APPLICATION_ERROR(-20001, 'Restaurant not found for ID ' || p_restaurant_id); 
+        END IF; 
+        
+    END IF;
+
+    SELECT name INTO v_restaurant_name
     FROM restaurant
     WHERE id = p_restaurant_id;
 
-    IF v_restaurant_exists = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001,
-                                'Restaurant not found for ID ' || p_restaurant_id);
-    END IF;
-
     -- Header
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('FEEDBACK SUMMARY BY MENU ITEM GROUP',
-                              v_line_width/2 + 17, '‎'));
+    DBMS_OUTPUT.PUT_LINE(LPAD('FEEDBACK SUMMARY BY MENU ITEM GROUP', v_line_width/2 + 17, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
+    DBMS_OUTPUT.PUT_LINE('Restaurant: ' || v_restaurant_name);
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
     DBMS_OUTPUT.PUT_LINE(
             RPAD('GROUP NAME',30) ||
@@ -427,15 +435,14 @@ BEGIN
         END LOOP;
         CLOSE cur_items;
 
-        DBMS_OUTPUT.PUT_LINE('‎'); -- blank line between groups
+        DBMS_OUTPUT.PUT_LINE('‎'); 
     END LOOP;
     CLOSE cur_groups;
-
-    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
-    DBMS_OUTPUT.PUT_LINE('Most Feedback Item : ' || v_most_feedback_items);
-    DBMS_OUTPUT.PUT_LINE('Highest Rated Item : ' || v_highest_rating_items);
-
+    
     -- Footer
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
+    DBMS_OUTPUT.PUT_LINE('Most Feedback Item : ' || (v_most_feedback_items));
+    DBMS_OUTPUT.PUT_LINE('Highest Rated Item : ' || (v_highest_rating_items));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
     DBMS_OUTPUT.PUT_LINE(LPAD('END OF REPORT', v_line_width/2 + 6, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
