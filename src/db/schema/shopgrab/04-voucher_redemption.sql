@@ -47,7 +47,7 @@ end before statement;
         where vd.id = :new.voucher_distribution_id
         group by v.id, v.usage_limit, v.from_date, v.thru_date, i.invoiced_at;
 
-        if (v_usage_limit <= v_voucher_usages(v_voucher_id)) then
+        if (v_usage_limit is not null) and (v_usage_limit <= v_voucher_usages(v_voucher_id)) then
             raise voucher_fully_redeemed;
         end if;
 
