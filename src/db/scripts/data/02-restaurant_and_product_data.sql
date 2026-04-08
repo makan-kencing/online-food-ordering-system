@@ -678,148 +678,202 @@ BEGIN
         LOOP
             v_created_by := rec.created_by_id;
 
-            -- Size groups
-            IF rec.name LIKE 'Size_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE name IN ('Small', 'Medium', 'Large', 'Regular', 'Personal', 'Family', 'Extra Large')
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-
-            -- Crust groups
-            IF rec.name LIKE 'Crust_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE (name LIKE '%Crust' OR name IN ('Gluten Free', 'Cauliflower', 'Cheese Burst'))
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-
-            -- Spice groups
-            IF rec.name LIKE 'Spice_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE name IN ('Mild', 'Medium Spice', 'Hot', 'Extra Hot', 'No Spice', 'Korean Spicy')
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-
-            -- Toppings groups
-            IF rec.name LIKE 'Toppings_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE name LIKE 'Extra%'
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-
-            -- Ice/Sugar groups
-            IF rec.name LIKE 'Ice_%' OR rec.name LIKE 'Sugar_%' OR rec.name LIKE 'Sweetener_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE (name LIKE '%Ice%' OR name LIKE '%Sugar%' OR
-                                    name IN ('Honey', 'Lemon Slice', 'Mint Leaves'))
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-
-            -- Patty groups
-            IF rec.name LIKE 'Patty_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE name LIKE '%Patty'
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-
-            -- Doneness groups
-            IF rec.name LIKE 'Doneness_%' OR rec.name LIKE 'Cook_%' THEN
-                FOR feat IN (SELECT id
-                             FROM product_feature
-                             WHERE name IN ('Well Done', 'Regular Cook', 'Light Cook')
-                               AND created_by_id = v_created_by)
-                    LOOP
-                        BEGIN
-                            INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                            VALUES (rec.id, feat.id);
-                            v_counter := v_counter + 1;
-                        EXCEPTION
-                            WHEN DUP_VAL_ON_INDEX THEN NULL;
-                        END;
-                    END LOOP;
-            END IF;
-        END LOOP;
-
-    FOR i IN 1..200
-        LOOP
             DECLARE
-                v_gid      NUMBER;
-                v_fid      NUMBER;
-                v_g_exists NUMBER;
-                v_f_exists NUMBER;
+                v_product_code VARCHAR2(20);
+                v_group_type VARCHAR2(20);
+                v_underscore_pos NUMBER;
+                v_restaurant_prefix VARCHAR2(10);
             BEGIN
-                v_gid := MOD(i, v_max_group_id) + 1;
-                v_fid := MOD(i, v_max_feature_id) + 1;
+                v_underscore_pos := INSTR(rec.name, '_');
+                IF v_underscore_pos > 0 THEN
+                    v_group_type := SUBSTR(rec.name, 1, v_underscore_pos - 1);
+                    v_product_code := SUBSTR(rec.name, v_underscore_pos + 1);
 
-                SELECT COUNT(*) INTO v_g_exists FROM product_feature_group WHERE id = v_gid;
-                SELECT COUNT(*) INTO v_f_exists FROM product_feature WHERE id = v_fid;
-
-                IF v_g_exists > 0 AND v_f_exists > 0 THEN
-                    INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
-                    VALUES (v_gid, v_fid);
-                    v_counter := v_counter + 1;
+                    v_restaurant_prefix := SUBSTR(v_product_code, 1, 2);
                 END IF;
-            EXCEPTION
-                WHEN DUP_VAL_ON_INDEX THEN NULL;
+
+                IF v_group_type = 'Size' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Small', 'Medium', 'Large', 'Regular', 'Personal', 'Family', 'Extra Large')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Crust' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE (name LIKE '%Crust' OR name IN ('Gluten Free', 'Cauliflower', 'Cheese Burst'))
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Spice' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Mild', 'Medium Spice', 'Hot', 'Extra Hot', 'No Spice', 'Korean Spicy')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Toppings' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name LIKE 'Extra%'
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Remove' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('No Onion', 'No Garlic', 'No Cheese')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Patty' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name LIKE '%Patty'
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type IN ('Doneness', 'Cook') THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Well Done', 'Regular Cook', 'Light Cook')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type IN ('Ice', 'Sugar', 'Sweetener') THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE (name LIKE '%Ice%' OR name LIKE '%Sugar%' OR name IN ('Honey', 'Lemon Slice', 'Mint Leaves'))
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Flavor' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Vanilla', 'Chocolate', 'Strawberry')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Noodle' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Egg Noodles', 'Rice Noodles')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Type' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Espresso Shot', 'Double Espresso', 'Maki Rolls', 'Nigiri')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Milk' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Soy Milk', 'Oat Milk', 'Almond Milk')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+
+                ELSIF v_group_type = 'Dip' THEN
+                    FOR feat IN (SELECT id FROM product_feature
+                                 WHERE name IN ('Soy Sauce', 'Wasabi', 'Ginger')
+                                   AND created_by_id = v_created_by
+                                   AND code LIKE v_restaurant_prefix || '%')
+                        LOOP
+                            BEGIN
+                                INSERT INTO product_feature_group_field (product_feature_group_id, product_feature_id)
+                                VALUES (rec.id, feat.id);
+                                v_counter := v_counter + 1;
+                            EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
+                            END;
+                        END LOOP;
+                END IF;
             END;
         END LOOP;
 
