@@ -13,9 +13,9 @@ FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 GROUP BY m.id, m.username;
 
-SELECT Member_ID, username, Latest_Expiry, Subscription_Status
-FROM membership_status_list
-ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
+-- SELECT Member_ID, username, Latest_Expiry, Subscription_Status
+-- FROM membership_status_list
+-- ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
 
 
 -- Queries -2
@@ -30,22 +30,22 @@ FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
 
-SELECT
-    username,
-    email,
-    TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
-FROM VW_UPCOMING_EXPIRATIONS
-UNION ALL
-SELECT
-    'No upcoming expirations' AS username,
-    'N/A' AS email,
-    'N/A' AS expiry_date
-FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM VW_UPCOMING_EXPIRATIONS);
-
-SELECT username, email, TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
-FROM VW_UPCOMING_EXPIRATIONS
-ORDER BY thru_date ASC;
+-- SELECT
+--     username,
+--     email,
+--     TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
+-- FROM VW_UPCOMING_EXPIRATIONS
+-- UNION ALL
+-- SELECT
+--     'No upcoming expirations' AS username,
+--     'N/A' AS email,
+--     'N/A' AS expiry_date
+-- FROM DUAL
+-- WHERE NOT EXISTS (SELECT 1 FROM VW_UPCOMING_EXPIRATIONS);
+--
+-- SELECT username, email, TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
+-- FROM VW_UPCOMING_EXPIRATIONS
+-- ORDER BY thru_date ASC;
 
 --PROCEDURE -1 : proc_subscribe_member
 CREATE OR REPLACE PROCEDURE proc_subscribe_member (
@@ -130,11 +130,9 @@ EXCEPTION
         RAISE;
 END;
 /
---EXEC proc_subscribe_member(59,2, 98.00, 1);
+--EXEC proc_subscribe_member(55,1, 10, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
-
-
 create or replace procedure proc_upgrade_current_membership(
     v_member_id IN MEMBER.ID%type,
     v_upgrade_membership_id IN MEMBERSHIP.ID%type,
@@ -204,6 +202,16 @@ END;
 /
 --EXEC proc_upgrade_membership(59, 1, 50.00, 1);
 
+SELECT
+    s.ID AS SUB_ID,
+    s.MEMBER_ID,
+    m.NAME AS MEMBERSHIP_PLAN,
+    s.FROM_DATE,
+    s.THRU_DATE
+FROM MONTHLY_SUBSCRIPTION s
+JOIN MEMBERSHIP m ON s.MEMBERSHIP_ID = m.ID
+WHERE s.MEMBER_ID = 113;
+
 -- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
 -- Why using the compound trigger is bc Mutating-Table Error .
@@ -246,28 +254,41 @@ END;
 
 --Trigger -2 : trg_check_sub_overlap
 CREATE OR REPLACE TRIGGER trg_check_sub_overlap
-BEFORE INSERT ON monthly_subscription
-FOR EACH ROW
-DECLARE
-    v_current_expiry DATE;
-    v_months_bought  NUMBER;
-BEGIN
-    SELECT MAX(thru_date)
-    INTO v_current_expiry
-    FROM monthly_subscription
-    WHERE member_id = :NEW.member_id;
+FOR INSERT ON monthly_subscription
+COMPOUND TRIGGER
 
-    IF v_current_expiry IS NOT NULL AND v_current_expiry > :NEW.from_date THEN
-        v_months_bought := ROUND(MONTHS_BETWEEN(:NEW.thru_date, :NEW.from_date));
-        :NEW.from_date := v_current_expiry;
-        :NEW.thru_date := ADD_MONTHS(v_current_expiry, v_months_bought);
+    TYPE member_date_tab IS TABLE OF DATE INDEX BY PLS_INTEGER;
+    v_expiry_map member_date_tab;
 
-    END IF;
+    BEFORE STATEMENT IS
+    BEGIN
+        FOR rec IN (SELECT member_id, MAX(thru_date) as max_date
+                    FROM monthly_subscription
+                    GROUP BY member_id)
+        LOOP
+            v_expiry_map(rec.member_id) := rec.max_date;
+        END LOOP;
+    END BEFORE STATEMENT;
 
-EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-        NULL;
-END;
+    BEFORE EACH ROW IS
+        v_current_expiry DATE;
+        v_months_bought  NUMBER;
+    BEGIN
+        IF v_expiry_map.EXISTS(:NEW.member_id) THEN
+            v_current_expiry := v_expiry_map(:NEW.member_id);
+        ELSE
+            v_current_expiry := NULL;
+        END IF;
+
+        IF v_current_expiry IS NOT NULL AND v_current_expiry > :NEW.from_date THEN
+            v_months_bought := ROUND(MONTHS_BETWEEN(:NEW.thru_date, :NEW.from_date));
+
+            :NEW.from_date := v_current_expiry;
+            :NEW.thru_date := ADD_MONTHS(v_current_expiry, v_months_bought);
+        END IF;
+    END BEFORE EACH ROW;
+
+END trg_check_sub_overlap;
 /
 
 -- SQL> SET LINESIZE 150;
@@ -549,7 +570,7 @@ BEGIN
 END;
 /
 
---EXEC monthly_payment_method_summary_report(2029, 1);
+--EXEC monthly_payment_method_summary_report(2025, 1);
 
 --index 1
 CREATE INDEX idx_pay_method_id ON payment(payment_method_id);
