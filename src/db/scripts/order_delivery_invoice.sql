@@ -41,11 +41,10 @@ SELECT
         END AS payment_status,
     COALESCE(i.amount, 0) AS total_amount,
 
-    -- 5. The "How" (High-level Fulfillment)
     o.order_type,
     CASE
         WHEN o.order_type = 2 THEN 'Customer Pickup'
-        WHEN dv.id IS NOT NULL THEN 'Delivered by ' || dv.name
+        WHEN o.order_type = 1 THEN 'Delivered by ' || dv.name
         ELSE 'Pending Dispatch'
         END AS dispatch_method
 
@@ -110,7 +109,7 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE(RPAD('ITEMS', 30) || 'SUBTOTAL');
     DBMS_OUTPUT.PUT_LINE('------------------------------------------');
 
-    -- Loop through order items
+    --Loop through and display all order items inside this order
     FOR item IN (
         SELECT p.name, oi.quantity, oi.unit_price
         FROM order_item oi
@@ -123,7 +122,7 @@ BEGIN
                     'RM ' || LPAD(TO_CHAR(v_item_subtotal, 'FM990.00'), 8)
             );
         END LOOP;
-
+    -- Display the payment reference and amount
     DBMS_OUTPUT.PUT_LINE('------------------------------------------');
     DBMS_OUTPUT.PUT_LINE(RPAD('PAYMENT REF:', 20) || v_ref_no);
     DBMS_OUTPUT.PUT_LINE(RPAD('TOTAL PAID :', 20) || 'RM ' || TO_CHAR(p_amount, 'FM999,990.00'));
@@ -230,7 +229,7 @@ CREATE OR REPLACE PROCEDURE proc_dispatch_order (
     v_estimated_arrive_at TIMESTAMP := v_dispatch_time + INTERVAL '45' MINUTE;
     v_already_dispatched  NUMBER;
 BEGIN
-    -- 1. Validate the Order exists
+    --Check whether the Order exists
     BEGIN
         SELECT order_type INTO v_order_type
         FROM orders
@@ -240,11 +239,12 @@ BEGIN
             RAISE_APPLICATION_ERROR(-20001, 'Order ID ' || p_order_id || ' not found.');
     END;
 
-    -- 2. Ensure it is a DELIVERY type
-    IF v_order_type != 'DELIVERY' THEN
+    --Ensure it is a DELIVERY type
+    IF v_order_type != 1 THEN
         RAISE_APPLICATION_ERROR(-20002, 'Cannot dispatch: This is a PICKUP order.');
     END IF;
-
+    
+    --Ensure it is a invoice exists to ensure the order is paid
     SELECT COUNT(*) INTO v_invoice_exists
     FROM invoice
     WHERE order_id = p_order_id;
@@ -253,7 +253,7 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20004, 'Cannot dispatch: Order ' || p_order_id || ' has not been invoiced/paid.');
     END IF;
 
-    -- 4. Check for existing delivery record (Unique Constraint Safety)
+    --Check whether the delivery for this order is already existing
     SELECT COUNT(*) INTO v_already_dispatched
     FROM delivery
     WHERE order_id = p_order_id;
@@ -272,7 +272,7 @@ BEGIN
     RETURNING id INTO v_delivery_id;
 
     COMMIT;
-
+    --Display Message for successful dispatch
     DBMS_OUTPUT.PUT_LINE('DISPATCH SUCCESSFUL - Invoice Verified');
     DBMS_OUTPUT.PUT_LINE('Delivery ID : ' || v_delivery_id);
     DBMS_OUTPUT.PUT_LINE('Order ID    : ' || p_order_id);
@@ -351,14 +351,14 @@ DECLARE
     v_is_paid NUMBER;
     v_order_id orders.id%TYPE;
 BEGIN
-    -- Determine which Order ID to check (handle delete via :OLD)
+    --Determine which Order ID to check (handle delete via :OLD)
    IF DELETING THEN
        v_order_id := :OLD.order_id;
    ELSE
        v_order_id := :NEW.order_id;
    end if;
 
-    -- Check if an invoice exists for this order
+    --Check if an invoice exists for this order
     SELECT COUNT(*) INTO v_is_paid
     FROM invoice
     WHERE order_id = v_order_id;
@@ -442,8 +442,9 @@ END;
 
 
 -- REPORT 1
--- Restaurant performance summary report
-CREATE OR REPLACE PROCEDURE proc_compare_vendors (p_year IN NUMBER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE))AS
+-- Vendors performance summary report by comparing each vendor 
+-- by their total orders and revenue made in that year
+CREATE OR REPLACE PROCEDURE proc_vendors_report (p_year IN NUMBER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE))AS
 
     v_order_count      NUMBER;
     v_total_revenue    NUMBER;
@@ -539,7 +540,7 @@ CREATE OR REPLACE PROCEDURE proc_state_order_summary(
     v_max_city_revenue  NUMBER;
 
     -- States
-    CURSOR cursor_states IS
+    CURSOR cur_states IS
         SELECT DISTINCT state FROM (
                                        SELECT a.state, o.ordered_at
                                        FROM orders o
@@ -576,7 +577,7 @@ CREATE OR REPLACE PROCEDURE proc_state_order_summary(
 BEGIN
     -- Header
     DBMS_OUTPUT.PUT_LINE(RPAD('=', 112, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('EXECUTIVE REGIONAL DEMAND REPORT (DIRECT LINK) : ' || p_year, 80));
+    DBMS_OUTPUT.PUT_LINE(LPAD('STATES ORDER REPORT FOR YEAR : ' || p_year, 80));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', 112, '='));
     DBMS_OUTPUT.PUT_LINE(
             RPAD('STATE', 8) || ' | ' ||
@@ -588,7 +589,7 @@ BEGIN
     );
     DBMS_OUTPUT.PUT_LINE(RPAD('-', 112, '-'));
 
-    FOR rec_state IN cursor_states LOOP
+    FOR rec_state IN cur_states LOOP
             v_state_orders := 0; v_state_revenue := 0;
             v_max_city_orders := -1; v_top_city_orders := 'N/A';
             v_max_city_revenue := -1; v_top_city_rev := 'N/A';
