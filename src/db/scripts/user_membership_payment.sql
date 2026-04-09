@@ -13,17 +13,17 @@ FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 GROUP BY m.id, m.username;
 
--- COLUMN username FORMAT A20;
--- COLUMN Expiry_Date FORMAT A12;
--- COLUMN Subscription_Status FORMAT A15;
--- SELECT
---     Member_ID,
---     username,
---     TO_CHAR(Latest_Expiry, 'YYYY-MM-DD') AS Expiry_Date,
---     Subscription_Status
--- FROM membership_status_list
--- ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
-/
+COLUMN username FORMAT A20;
+COLUMN Expiry_Date FORMAT A12;
+COLUMN Subscription_Status FORMAT A15;
+SELECT
+    Member_ID,
+    username,
+    TO_CHAR(Latest_Expiry, 'YYYY-MM-DD') AS Expiry_Date,
+    Subscription_Status
+FROM membership_status_list
+ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
+
 -- Queries -2
 -- check the nearby expired membership subscription of each member
 -- (will check the subscription data that nearby the expired date one week)
@@ -419,7 +419,7 @@ BEGIN
 
         v_grand_new_join  := v_grand_new_join + rec_stats.new_join;
         v_grand_new_sub   := v_grand_new_sub + rec_stats.new_subs;
-        v_grand_total_rev := v_grand_total_rev + rec_stats.subtotal + v_prepaid_rev;  -- 加上 prepaid
+        v_grand_total_rev := v_grand_total_rev + rec_stats.subtotal + v_prepaid_rev;
     END LOOP;
     CLOSE cur_months;
 
