@@ -231,7 +231,7 @@ BEGIN
     END IF;
 
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('RESTAURANT MENU REVENUE REPORT', v_line_width/2 + 15));
+    DBMS_OUTPUT.PUT_LINE(LPAD('RESTAURANT MENU REVENUE REPORT', v_line_width/2 + 15, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
     DBMS_OUTPUT.PUT_LINE('‎');
 
@@ -260,11 +260,11 @@ BEGIN
 
             -- Header for menu items
             DBMS_OUTPUT.PUT_LINE(
-                    RPAD('MENU ITEM',40) ||
-                    RPAD('QUANTITY SOLD',25) ||
-                    RPAD('REVENUE (RM)',20)
+                    RPAD('MENU ITEM',50) ||
+                    RPAD('QUANTITY SOLD',30) ||
+                    RPAD('REVENUE (RM)',40)
             );
-            DBMS_OUTPUT.PUT_LINE(RPAD('-', 80, '-'));
+            DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
 
             OPEN cur_items(rec_restaurant.id, rec_category.id);
             LOOP
@@ -272,9 +272,9 @@ BEGIN
                 EXIT WHEN cur_items%NOTFOUND;
 
                 DBMS_OUTPUT.PUT_LINE(
-                        RPAD(rec_item.product_name,40) ||
-                        LPAD(rec_item.quantity_sold,13) ||
-                        LPAD(TO_CHAR(rec_item.revenue,'999,999.99'),23)
+                        RPAD(rec_item.product_name,50) ||
+                        RPAD(rec_item.quantity_sold,30) ||
+                        RPAD(TO_CHAR(rec_item.revenue,'999,999.99'),40)
                 );
 
                 v_category_total := v_category_total + rec_item.revenue;
@@ -288,19 +288,19 @@ BEGIN
             END LOOP;
             CLOSE cur_items;
 
-            DBMS_OUTPUT.PUT_LINE(RPAD('-',80,'-'));
-            DBMS_OUTPUT.PUT_LINE('Category Total Revenue: RM ' || TO_CHAR(v_category_total,'999,999.99'));
+            DBMS_OUTPUT.PUT_LINE(RPAD('-',v_line_width,'-'));
+            DBMS_OUTPUT.PUT_LINE('Category Total Revenue: RM ' || TO_CHAR(v_category_total,'FM999,999,990.00'));
             DBMS_OUTPUT.PUT_LINE('‎');
 
         END LOOP;
         CLOSE cur_categories;
 
-        DBMS_OUTPUT.PUT_LINE(RPAD('-',80,'-'));
-        DBMS_OUTPUT.PUT_LINE('Restaurant Total Revenue: RM ' || TO_CHAR(v_restaurant_total,'999,999.99'));
+        DBMS_OUTPUT.PUT_LINE(RPAD('-',v_line_width,'-'));
+        DBMS_OUTPUT.PUT_LINE('Restaurant Total Revenue: RM ' || TO_CHAR(v_restaurant_total,'FM999,999,990.00'));
 
         IF v_top_item_name IS NOT NULL THEN
             DBMS_OUTPUT.PUT_LINE('Top Revenue Item: ' || v_top_item_name ||
-                                 ' (RM ' || TO_CHAR(v_top_item_revenue,'999,999.99') || ')');
+                                 ' (RM ' || TO_CHAR(v_top_item_revenue,'FM999,999,990.00') || ')');
         END IF;
 
         DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
@@ -308,7 +308,7 @@ BEGIN
     END LOOP;
     CLOSE cur_restaurants;
 
-    DBMS_OUTPUT.PUT_LINE('END OF REPORT');
+    DBMS_OUTPUT.PUT_LINE(LPAD('END OF REPORT', v_line_width/2 + 6, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
 
 END;
@@ -322,8 +322,8 @@ commit;
 
 -- Report - 2
 -- Display a restaurant feedback by menu item group
-CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_by_restaurant (
-    p_restaurant_id IN NUMBER
+CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_report (
+    p_restaurant_id IN NUMBER DEFAULT NUll
 ) IS
     v_line_width CONSTANT NUMBER := 120;
     v_restaurant_exists NUMBER;
