@@ -575,7 +575,7 @@ class Seeder:
                     membership_id=membership.id,
                     member_id=member.id,
                     from_date=current_dt,
-                    thru_date=current_dt + timedelta(days=30)
+                    thru_date=current_dt + timedelta(days=30) - timedelta(seconds=1)
                 )
                 subscription.payments.add(models.SubscriptionPayment(
                     payment=payment,
