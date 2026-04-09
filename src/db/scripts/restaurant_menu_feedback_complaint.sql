@@ -322,8 +322,8 @@ commit;
 
 -- Report - 2
 -- Display a restaurant feedback by menu item group
-CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_by_restaurant (
-    p_restaurant_id IN NUMBER
+CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_report (
+    p_restaurant_id IN NUMBER DEFAULT NUll
 ) IS
     v_line_width CONSTANT NUMBER := 120;
     v_restaurant_exists NUMBER;
