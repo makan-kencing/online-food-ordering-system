@@ -12,3 +12,6 @@ CREATE TABLE orders
     order_type    order_type                          NOT NULL,
     restaurant_id INT REFERENCES restaurant (id)      NOT NULL
 );
+
+CREATE INDEX idx_order_queue
+    ON orders (ordered_at DESC, order_type);

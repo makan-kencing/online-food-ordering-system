@@ -7,3 +7,7 @@ CREATE TABLE order_item
     unit_price DECIMAL CHECK ( unit_price > 0 ) NOT NULL,
     remarks    VARCHAR(50)
 );
+
+
+CREATE INDEX idx_order_cart
+    ON order_item (order_id, product_id);
