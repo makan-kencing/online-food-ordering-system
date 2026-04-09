@@ -61,9 +61,18 @@ CREATE OR REPLACE PROCEDURE proc_finalize_payment (
     v_order_type    orders.order_type%TYPE;
     v_restaurant_id orders.restaurant_id%TYPE;
     v_rest_name     restaurant.name%TYPE;
+    v_item_count    INT;
     v_item_subtotal NUMBER;
 
 BEGIN
+    SELECT COUNT(*) INTO v_item_count
+    FROM order_item
+    WHERE order_id = p_order_id;
+
+    IF v_item_count = 0 THEN
+        RAISE_APPLICATION_ERROR(-20402, 'CRITICAL: Cannot process payment. Order ' || p_order_id || ' contains no items.');
+    END IF;
+    
     SELECT o.order_type, o.restaurant_id, r.name
     INTO v_order_type, v_restaurant_id, v_rest_name
     FROM orders o
