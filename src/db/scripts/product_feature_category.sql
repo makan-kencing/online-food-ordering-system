@@ -845,3 +845,24 @@ BEGIN
     category_revenue_report('R1');
 END;
 /
+
+-- View original data
+SELECT id, code, name, description
+FROM product
+WHERE code = 'R1PIZ001';
+
+-- Test product audit
+UPDATE product
+SET name = 'Margherita Pizza Deluxe'
+WHERE code = 'R1PIZ001';
+
+-- Test update multiple columns at once
+UPDATE product
+SET name = 'Margherita Pizza Original',
+    description = 'Classic Italian pizza with fresh basil and extra virgin olive oil'
+WHERE code = 'R1PIZ001';
+
+-- Restore original name
+UPDATE product
+SET name = 'Margherita Pizza'
+WHERE code = 'R1PIZ001';
