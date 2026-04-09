@@ -129,7 +129,7 @@ EXCEPTION
         ROLLBACK;
         RAISE;
 END;
-
+/
 --EXEC proc_subscribe_member(59,2, 98.00, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
@@ -201,6 +201,7 @@ EXCEPTION
         ROLLBACK;
         RAISE;
 END;
+/
 --EXEC proc_upgrade_membership(59, 1, 50.00, 1);
 
 -- Trigger -1
@@ -241,6 +242,7 @@ COMPOUND TRIGGER
         v_a_ids.DELETE;
     END AFTER STATEMENT;
 END;
+/
 
 --Trigger -2 : trg_check_sub_overlap
 CREATE OR REPLACE TRIGGER trg_check_sub_overlap
@@ -266,6 +268,7 @@ EXCEPTION
     WHEN NO_DATA_FOUND THEN
         NULL;
 END;
+/
 
 -- SQL> SET LINESIZE 150;
 -- SQL> SET PAGESIZE 400;
