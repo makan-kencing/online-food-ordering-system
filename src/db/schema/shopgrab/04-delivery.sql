@@ -7,3 +7,30 @@ CREATE TABLE delivery
     ordered_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     estimated_arrive_at TIMESTAMP                           NOT NULL
 );
+
+
+
+CREATE SEQUENCE seq_daily_tracking_no
+    START WITH 1
+    INCREMENT BY 1
+    MAXVALUE 9999
+    CYCLE;
+
+CREATE OR REPLACE PROCEDURE reset_daily_tracking_seq AS
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER SEQUENCE seq_daily_tracking_no RESTART START WITH 1';
+END;
+/
+
+BEGIN
+    DBMS_SCHEDULER.CREATE_JOB (
+            job_name        => 'JOB_RESET_TRACKING_SEQ_DAILY',
+            job_type        => 'STORED_PROCEDURE',
+            job_action      => 'RESET_DAILY_TRACKING_SEQ',
+            start_date      => SYSTIMESTAMP,
+            repeat_interval => 'FREQ=DAILY;BYHOUR=0;BYMINUTE=0;BYSECOND=0',
+            enabled         => TRUE,
+            comments        => 'Resets the delivery tracking number sequence to 1 every day at midnight'
+    );
+END;
+/
