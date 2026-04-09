@@ -440,7 +440,7 @@ class Seeder:
             .join(models.ProductFeatureGroup.fields) \
             .join(models.ProductFeatureGroupField.product_feature)
         menu_items = self.session.scalars(stmt).unique().all()
-        for menu_item in random.sample(menu_items, k=max(int(random.random() ** 3 * len(menu_items)), 1)):
+        for menu_item in random.sample(menu_items, k=max(round(random.random() ** 3 * len(menu_items)), 1)):
             product = menu_item.product
             quantity = random.choices((1, 2, 3), k=1, weights=[0.8, 0.15, 0.05])[0]
 
