@@ -13,15 +13,17 @@ FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 GROUP BY m.id, m.username;
 
-SELECT
-    Member_ID,
-    username,
-    TO_CHAR(Latest_Expiry, 'YYYY-MM-DD') AS Expiry_Date, -- 关键修改
-    Subscription_Status
-FROM membership_status_list
-ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
+-- COLUMN username FORMAT A20;
+-- COLUMN Expiry_Date FORMAT A12;
+-- COLUMN Subscription_Status FORMAT A15;
+-- SELECT
+--     Member_ID,
+--     username,
+--     TO_CHAR(Latest_Expiry, 'YYYY-MM-DD') AS Expiry_Date,
+--     Subscription_Status
+-- FROM membership_status_list
+-- ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
 /
-
 -- Queries -2
 -- check the nearby expired membership subscription of each member
 -- (will check the subscription data that nearby the expired date one week)
@@ -34,19 +36,22 @@ FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
 
-SELECT
-    username,
-    email,
-    TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
-FROM VW_UPCOMING_EXPIRATIONS
-UNION ALL
-SELECT
-    'No upcoming expirations' AS username,
-    'N/A' AS email,
-    'N/A' AS expiry_date
-FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM VW_UPCOMING_EXPIRATIONS)
-ORDER BY expiry_date ASC;
+
+-- COLUMN username FORMAT A20;
+-- COLUMN email FORMAT A30;
+-- SELECT
+--     username,
+--     email,
+--     TO_CHAR(thru_date, 'YYYY-MM-DD') AS expiry_date
+-- FROM VW_UPCOMING_EXPIRATIONS
+-- UNION ALL
+-- SELECT
+--     'No upcoming expirations' AS username,
+--     'N/A' AS email,
+--     'N/A' AS expiry_date
+-- FROM DUAL
+-- WHERE NOT EXISTS (SELECT 1 FROM VW_UPCOMING_EXPIRATIONS)
+-- ORDER BY expiry_date ASC;
 /
 --PROCEDURE -1 : proc_subscribe_member
 CREATE OR REPLACE PROCEDURE proc_subscribe_member (
