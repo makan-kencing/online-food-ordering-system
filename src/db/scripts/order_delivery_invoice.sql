@@ -19,7 +19,12 @@ SELECT
 FROM orders o
          INNER JOIN member m ON o.member_id = m.id      
          LEFT JOIN invoice i ON o.id = i.order_id;
-
+-- SET LINESIZE 120
+-- SET PAGESIZE 120
+--     COLUMN order_time FORMAT A12;
+-- COLUMN status FORMAT A8;
+-- COLUMN order_type FORMAT A15;
+-- COLUMN revenue FORMAT 999,990.00;
 SELECT * FROM vw_order_overview
 WHERE cust_name = 'ocox6';
 
@@ -44,8 +49,17 @@ FROM orders o
 WHERE a.state IS NOT NULL
 GROUP BY a.state, a.city;
 
+-- SET LINESIZE 120;
+-- SET PAGESIZE 120;
+-- COLUMN state FORMAT A10;
+-- COLUMN city FORMAT A30;
+-- COLUMN total_orders FORMAT 99,999 HEADING 'TOTAL ORDERS';
+-- COLUMN total_revenue FORMAT 999,990.00 HEADING 'TOTAL REVENUE (RM)';
+-- COLUMN avg_order_value FORMAT 999,990.00 HEADING 'AVG ORDER VALUE (RM)';
 SELECT * FROM vw_city_order WHERE UPPER(TRIM(state)) = 'WA'
 ORDER BY city ASC;
+
+
 
 --PROCEDURE 1
 --To create order and generate receipt
@@ -70,7 +84,7 @@ BEGIN
     WHERE order_id = p_order_id;
 
     IF v_item_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20402, 'CRITICAL: Cannot process payment. Order ' || p_order_id || ' contains no items.');
+        RAISE_APPLICATION_ERROR(-20402, 'Cannot process payment. Order ' || p_order_id || ' contains no items.');
     END IF;
     
     SELECT o.order_type, o.restaurant_id, r.name
@@ -140,39 +154,36 @@ END;
 /
 
 
---PROCEDURE 1 TEST CASE                 
--- DECLARE
---     -- We only need a variable to catch the new order ID
---     v_test_order_id orders.id%TYPE;
--- BEGIN
---     DBMS_OUTPUT.PUT_LINE('--- TEST 1: SUCCESSFUL PAYMENT ---');
--- 
---     -- 1. Create a quick dummy order
---     INSERT INTO orders (member_id, order_type, restaurant_id, ordered_at)
---     VALUES (2, 1, 1, CURRENT_TIMESTAMP)
---     RETURNING id INTO v_test_order_id;
--- 
---     -- 2. Add an item (e.g., 2x Product #4 at RM 25.00)
---     INSERT INTO order_item (order_id, product_id, quantity, unit_price)
---     VALUES (v_test_order_id, 4, 2, 25.00);
--- 
---     -- 3. Call your procedure
---     -- Passing the new Order ID, Payment Method 2 (Card), and RM 50.00 Total
---     proc_finalize_payment(
---             p_order_id          => v_test_order_id,
---             p_payment_method_id => 2,
---             p_amount            => 50.00,
---             p_description       => 'Test Case 1 - Standard Payment'
---     );
--- END;
--- /
+-- PROCEDURE 1 TEST CASE                 
+DECLARE
+    -- We only need a variable to catch the new order ID
+    v_test_order_id orders.id%TYPE;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('--- TEST 1: SUCCESSFUL PAYMENT ---');
+
+    -- 1. Create a quick dummy order
+    INSERT INTO orders (member_id, order_type, restaurant_id, ordered_at)
+    VALUES (2, 1, 1, CURRENT_TIMESTAMP)
+    RETURNING id INTO v_test_order_id;
+
+    -- 2. Add an item (e.g., 2x Product #4 at RM 25.00)
+    INSERT INTO order_item (order_id, product_id, quantity, unit_price)
+    VALUES (v_test_order_id, 4, 2, 25.00);
+
+    -- 3. Call your procedure
+    -- Passing the new Order ID, Payment Method 2 (Card), and RM 50.00 Total
+    proc_finalize_payment(
+            p_order_id          => v_test_order_id,
+            p_payment_method_id => 2,
+            p_amount            => 50.00,
+            p_description       => 'Test Case 1 - Standard Payment'
+    );
+END;
+/
 
     
     
-SELECT id
-FROM orders
-ORDER BY id DESC
-    FETCH FIRST 1 ROW ONLY;
+
 
 --PROCEDURE 2
 --To create orders in delivery table
@@ -198,12 +209,10 @@ BEGIN
             RAISE_APPLICATION_ERROR(-20001, 'Order ID ' || p_order_id || ' not found.');
     END;
 
-    --Ensure it is a DELIVERY type
     IF v_order_type != 1 THEN
         RAISE_APPLICATION_ERROR(-20002, 'Cannot dispatch: This is a PICKUP order.');
     END IF;
     
-    --Ensure it is a invoice exists to ensure the order is paid
     SELECT COUNT(*) INTO v_invoice_exists
     FROM invoice
     WHERE order_id = p_order_id;
@@ -212,7 +221,6 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20004, 'Cannot dispatch: Order ' || p_order_id || ' has not been invoiced/paid.');
     END IF;
 
-    --Check whether the delivery for this order is already existing
     SELECT COUNT(*) INTO v_already_dispatched
     FROM delivery
     WHERE order_id = p_order_id;
@@ -231,7 +239,7 @@ BEGIN
     RETURNING id INTO v_delivery_id;
 
     COMMIT;
-    --Display Message for successful dispatch
+    --Display successful dispatch message
     DBMS_OUTPUT.PUT_LINE('DISPATCH SUCCESSFUL - Invoice Verified');
     DBMS_OUTPUT.PUT_LINE('Delivery ID : ' || v_delivery_id);
     DBMS_OUTPUT.PUT_LINE('Order ID    : ' || p_order_id);
@@ -243,53 +251,53 @@ EXCEPTION
 END;
 /
 
--- --PROCEDURE 2 TESTING
--- -- 1. Create the Order record
--- DECLARE
---     v_order_id   orders.id%TYPE;
---     v_payment_id payment.id%TYPE;
--- BEGIN
---     -- 1. Create the Order and capture the ID
---     -- NOTE: Use 'DELIVERY' instead of 1 to satisfy the procedure's internal check
---     INSERT INTO orders (member_id, order_type, restaurant_id, ordered_at)
---     VALUES (2, 1, 1, CURRENT_TIMESTAMP)
---     RETURNING id INTO v_order_id;
--- 
---     -- 2. Add Items to the Order using the variable
---     -- 2x Classic Cheeseburger
---     -- Crispy Chicken Burger
---     INSERT INTO order_item (order_id, product_id, quantity, unit_price)
---     VALUES (v_order_id, 4, 2, 25.00);
--- 
---     -- 1x Crispy Chicken Burger
---     INSERT INTO order_item (order_id, product_id, quantity, unit_price)
---     VALUES (v_order_id, 5, 1, 15.00);
--- 
---     -- 3. Create Payment (Using Method 2 - Card)
---     -- Total amount: (2 * 25) + 15 = 65.00
---     INSERT INTO payment (payment_method_id, amount, payment_method_data)
---     VALUES (2, 65.00, '{"description": "Test Case Dispatch"}')
---     RETURNING id INTO v_payment_id;
--- 
---     -- 4. Create Invoice (The procedure will fail if this is missing)
---     INSERT INTO invoice (order_id, payment_id, amount)
---     VALUES (v_order_id, v_payment_id, 65.00);
--- 
---     -- 5. Execute the Dispatch Procedure
---     -- Parameters: New Order ID, Address ID (1), Vendor ID (1 - Grab)
--- 
---     BEGIN
---         proc_dispatch_order(
---                 p_order_id   => v_order_id,
---                 p_address_id => 1,
---                 p_vendor_id  => 1
---         );
---     end;
---     -- Commit all changes
--- 
--- 
--- END;
--- /
+--PROCEDURE 2 TESTING
+-- 1. Create the Order record
+DECLARE
+    v_order_id   orders.id%TYPE;
+    v_payment_id payment.id%TYPE;
+BEGIN
+    -- 1. Create the Order and capture the ID
+    INSERT INTO orders (member_id, order_type, restaurant_id, ordered_at)
+    VALUES (2, 1, 1, CURRENT_TIMESTAMP)
+    RETURNING id INTO v_order_id;
+
+    -- 2. Add Items to the Order using the variable
+    -- 2x Classic Cheeseburger
+    -- Crispy Chicken Burger
+    INSERT INTO order_item (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, 4, 2, 25.00);
+
+    -- 1x Crispy Chicken Burger
+    INSERT INTO order_item (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, 5, 1, 15.00);
+
+    -- 3. Create Payment (Using Method 2 - Card)
+    -- Total amount: (2 * 25) + 15 = 65.00
+    INSERT INTO payment (payment_method_id, amount, payment_method_data)
+    VALUES (2, 65.00, '{"description": "Test Case Dispatch"}')
+    RETURNING id INTO v_payment_id;
+
+    -- 4. Create Invoice 
+    INSERT INTO invoice (order_id, payment_id, amount)
+    VALUES (v_order_id, v_payment_id, 65.00);
+
+    -- 5. Execute the Dispatch Procedure
+    -- Parameters: New Order ID, Address ID (1), Vendor ID (1 - Grab)
+
+    BEGIN
+        proc_dispatch_order(
+                p_order_id   => v_order_id,
+                p_address_id => 1,
+                p_vendor_id  => 1
+        );
+    end;
+    
+    COMMIT;
+
+
+END;
+/
 
 CREATE OR REPLACE PROCEDURE calculate_order_total (
     p_order_id IN INT,
@@ -300,13 +308,13 @@ CREATE OR REPLACE PROCEDURE calculate_order_total (
     v_item_adj_total   DECIMAL(10, 2) := 0;
     v_order_adj_total  DECIMAL(10, 2) := 0;
 BEGIN
-    --Calculate Base Items: (unit_price * quantity)
+    --Calculate Base Items(unit_price * quantity)
     SELECT NVL(SUM(unit_price * quantity), 0)
     INTO v_item_total
     FROM order_item
     WHERE order_id = p_order_id;
 
-    --Calculate Product Features: (unit_price * quantity) 
+    --Calculate Product Features(unit_price * quantity) 
     SELECT NVL(SUM(oif.unit_price * oif.quantity), 0)
     INTO v_feature_total
     FROM order_item_feature oif
@@ -358,7 +366,7 @@ ORDER BY id DESC
     FETCH FIRST 1 ROW ONLY;
 
 
--- PROCEDURE TESTING: Calculate Order Total
+-- PROCEDURE 3 TEST
 DECLARE
     v_order_id     orders.id%TYPE;
     v_item_1_id    order_item.id%TYPE;
@@ -366,13 +374,12 @@ DECLARE
     v_calculated   DECIMAL(10,2);
 BEGIN
 
-    -- 1. Create the Order and capture the ID
-    -- Using member_id = 2, order_type = 'DELIVERY', restaurant_id = 1
+    -- 1. Create the Order
     INSERT INTO orders (member_id, order_type, restaurant_id, ordered_at)
     VALUES (2, 1, 1, CURRENT_TIMESTAMP)
     RETURNING id INTO v_order_id;
 
-    -- 2. Add Items to the Order and capture their IDs
+    -- 2. Add Items to the Order and get order_item id
     -- Item 1: 2x Classic Cheeseburger @ RM 25.00 = RM 50.00
     INSERT INTO order_item (order_id, product_id, quantity, unit_price)
     VALUES (v_order_id, 4, 2, 25.00)
@@ -391,23 +398,37 @@ BEGIN
     INSERT INTO order_item_adjustment (order_id, order_item_id, adjustment_type, percentage)
     VALUES (v_order_id, v_item_1_id, 1, 0.1000);
 
-    -- Math Checkpoint: Adjusted Total is RM 60.00
+    -- Adjusted Total is RM 60.00
 
     -- 4. Apply an Order-Level Adjustment
-    -- RM 5.00 Delivery Fee (No specific order_item_id, applies to whole order)
+    -- RM 5.00 Delivery Fee 
     -- Calculation: +RM 5.00
     INSERT INTO order_item_adjustment (order_id, adjustment_type, amount)
     VALUES (v_order_id, 5, 5.00);
 
     -- Final Math Checkpoint: Expected Total is RM 65.00 (60.00 + 5.00)
 
-    -- 5. Execute the Procedure
+    -- 5. Execute the Calculation
     calculate_order_total(
             p_order_id    => v_order_id,
             p_total_price => v_calculated
     );
+
+    proc_finalize_payment(
+            p_order_id          => v_order_id,
+            p_payment_method_id => 2,
+            p_amount            => v_calculated,
+            p_description       => 'Order Paid with Card Payments'
+    );
+    
 END;
 /
+SELECT id
+FROM orders
+ORDER BY id DESC
+    FETCH FIRST 1 ROW ONLY;
+
+
 --TRIGGER 1
 --Lock Orders once placed
 CREATE OR REPLACE TRIGGER trg_order_item_lock
@@ -435,9 +456,9 @@ BEGIN
 END;
 /
 -- --Test trigger 1
--- UPDATE order_item
--- SET quantity = 5
--- WHERE id = 343;
+UPDATE order_item
+SET quantity = 5
+WHERE id = 343;
 
 
 --TRIGGER 2
@@ -450,7 +471,6 @@ DECLARE
     v_item_is_valid       NUMBER;
     v_product_name        product.NAME%type;
 BEGIN
-    --Identify which restaurant this order is officially tied to
     SELECT restaurant_id INTO v_order_restaurant_id
     FROM orders
     WHERE id = :NEW.order_id;
@@ -459,7 +479,6 @@ BEGIN
     FROM product
     WHERE id = :NEW.product_id;
 
-    --Check if the order_item being added is actually sold by that restaurant
     SELECT COUNT(*) INTO v_item_is_valid
     FROM menu_item
     WHERE product_id = :NEW.product_id
@@ -476,35 +495,12 @@ EXCEPTION
         RAISE_APPLICATION_ERROR(-20003, 'Order ID or Product ID does not exist.');
 END;
 /
---TRIGGER 2 TEST
--- -- Create Order #1 at Pizza Palace (Restaurant ID 1)
--- INSERT INTO orders (member_id, order_type, restaurant_id)
--- VALUES (2, 1, 1);
--- 
--- -- Create Order #2 at Burger King Express (Restaurant ID 2)
--- INSERT INTO orders (member_id, order_type, restaurant_id)
--- VALUES (3, 2, 2);
--- 
--- -- Adding Margherita Pizza to the Pizza Palace order
--- INSERT INTO order_item (order_id, product_id, quantity, unit_price)
--- VALUES (1, 1, 1, 25.00);
--- 
--- -- Verify the success
--- SELECT * FROM order_item WHERE order_id = 1;
--- 
--- 
--- -- "Order Item Classic Cheeseburger is not on the menu for the selected restaurant."
--- INSERT INTO order_item (order_id, product_id, quantity, unit_price)
--- VALUES (1, 4, 1, 12.00);
--- 
--- -- First, add a valid burger to the Burger King order
--- INSERT INTO order_item (order_id, product_id, quantity, unit_price)
--- VALUES (2, 4, 1, 15.00);
--- 
--- -- Now, try to update that item to a Pizza (Product 1)
--- UPDATE order_item
--- SET product_id = 1
--- WHERE order_id = 2 AND product_id = 4;
+
+
+-- Test trigger 2
+UPDATE order_item
+SET product_id = 1
+WHERE order_id = 2 AND product_id = 4;
 
 
 -- REPORT 1
@@ -580,9 +576,6 @@ BEGIN
 
     DBMS_OUTPUT.PUT_LINE(RPAD('=', 70, '='));
 
-EXCEPTION
-    WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
 END;
 /
 
@@ -651,13 +644,12 @@ CREATE OR REPLACE PROCEDURE proc_state_order_summary (
                 address_id,
                 ROW_NUMBER() OVER (PARTITION BY member_id ORDER BY address_id) AS rn
             FROM member_address
-        ) ma
-                      ON o.member_id = ma.member_id
-                          AND ma.rn = 1
-                 JOIN address a
-                      ON ma.address_id = a.id
-                 LEFT JOIN invoice i
-                           ON o.id = i.order_id
+        ) ma ON o.member_id = ma.member_id
+              AND ma.rn = 1
+         JOIN address a
+              ON ma.address_id = a.id
+         LEFT JOIN invoice i
+      ON o.id = i.order_id
         WHERE a.state = p_state_name
           AND EXTRACT(YEAR  FROM o.ordered_at) = p_year
           AND EXTRACT(MONTH FROM o.ordered_at) = p_month
@@ -780,6 +772,9 @@ BEGIN
     proc_state_order_summary(2026, 4);
 end;
 /
+
+
+
 
 
 
