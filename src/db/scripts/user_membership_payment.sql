@@ -12,30 +12,30 @@ SELECT
 FROM member m
 JOIN monthly_subscription sub ON m.id = sub.member_id
 GROUP BY m.id, m.username;
-
-COLUMN username FORMAT A20;
-COLUMN Expiry_Date FORMAT A12;
-COLUMN Subscription_Status FORMAT A15;
-SELECT
-    Member_ID,
-    username,
-    TO_CHAR(Latest_Expiry, 'YYYY-MM-DD') AS Expiry_Date,
-    Subscription_Status
-FROM membership_status_list
-ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
-
--- Queries -2
--- check the nearby expired membership subscription of each member
--- (will check the subscription data that nearby the expired date one week)
-CREATE VIEW VW_UPCOMING_EXPIRATIONS AS
-SELECT
-    m.username,
-    m.email,
-    sub.thru_date
-FROM member m
-JOIN monthly_subscription sub ON m.id = sub.member_id
-WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
-
+/
+-- COLUMN username FORMAT A20;
+-- COLUMN Expiry_Date FORMAT A12;
+-- COLUMN Subscription_Status FORMAT A15;
+-- SELECT
+--     Member_ID,
+--     username,
+--     TO_CHAR(Latest_Expiry, 'YYYY-MM-DD') AS Expiry_Date,
+--     Subscription_Status
+-- FROM membership_status_list
+-- ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
+--
+-- -- Queries -2
+-- -- check the nearby expired membership subscription of each member
+-- -- (will check the subscription data that nearby the expired date one week)
+-- CREATE VIEW VW_UPCOMING_EXPIRATIONS AS
+-- SELECT
+--     m.username,
+--     m.email,
+--     sub.thru_date
+-- FROM member m
+-- JOIN monthly_subscription sub ON m.id = sub.member_id
+-- WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
+/
 
 -- COLUMN username FORMAT A20;
 -- COLUMN email FORMAT A30;
@@ -217,7 +217,7 @@ SELECT
 FROM MONTHLY_SUBSCRIPTION s
 JOIN MEMBERSHIP m ON s.MEMBERSHIP_ID = m.ID
 WHERE s.MEMBER_ID = 113;
-
+/
 -- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
 -- Why using the compound trigger is bc Mutating-Table Error .
@@ -581,6 +581,7 @@ END;
 
 --index 1
 CREATE INDEX idx_pay_method_id ON payment(payment_method_id);
-
+/
 --index 2
 CREATE INDEX idx_pay_paid_at ON payment(paid_at);
+/
