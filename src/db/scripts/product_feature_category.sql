@@ -1,3 +1,9 @@
+SET LINESIZE 200;
+SET PAGESIZE 50;
+SET WRAP OFF;
+SET TRIMOUT ON;
+SET TRIMSPOOL ON;
+
 -- ========================================
 -- VIEW 1: PRODUCT FEATURE HIERARCHY VIEW
 -- Shows complete product hierarchy with feature groups and features
@@ -33,6 +39,15 @@ SELECT
 FROM grouped_features
 ORDER BY product_id, feature_group_name;
 
+COLUMN product_id FORMAT 9999 HEADING 'Prod|ID'
+COLUMN product_code FORMAT A12 HEADING 'Product|Code'
+COLUMN product_name FORMAT A25 HEADING 'Product Name'
+COLUMN product_description FORMAT A30 HEADING 'Description' WRAP
+COLUMN feature_group_name FORMAT A20 HEADING 'Feature Group'
+COLUMN min_required FORMAT 999 HEADING 'Min'
+COLUMN max_allowed FORMAT 999 HEADING 'Max'
+COLUMN features_in_group FORMAT A40 HEADING 'Features in Group' WRAP
+
 SELECT * FROM vw_product_feature_hierarchy WHERE product_code = 'R1PIZ001';
 SELECT * FROM vw_product_feature_hierarchy WHERE product_code = 'R1PIZ004';
 SELECT * FROM vw_product_feature_hierarchy;
@@ -58,8 +73,16 @@ FROM product_category pc
 WHERE (pcc.thru_date IS NULL OR pcc.thru_date > CURRENT_TIMESTAMP)
 ORDER BY pc.name, p.name;
 
+COLUMN category_id FORMAT 9999 HEADING 'Cat|ID'
+COLUMN category_name FORMAT A20 HEADING 'Category Name'
+COLUMN parent_category FORMAT A20 HEADING 'Parent Category'
+COLUMN is_primary FORMAT A10 HEADING 'Is Primary'
+COLUMN product_id FORMAT 9999 HEADING 'Prod|ID'
+COLUMN product_code FORMAT A12 HEADING 'Product|Code'
+COLUMN product_name FORMAT A25 HEADING 'Product Name'
+
 SELECT * FROM vw_product_category_hierarchy WHERE is_primary = false;
-SELECT * FROM vw_product_category_hierarchy;
+SELECT * FROM vw_product_category_hierarchy WHERE parent_category = 'Burgers';
 
 
 -- ========================================
@@ -804,45 +827,48 @@ EXEC add_feature_group_to_product('R1PIZ004', 'Sauce Options', 'BBQ,Original,Ran
 
 -- Feature Popularity Report for Restaurant 1
 EXEC feature_popularity_report('R1');
+EXEC feature_popularity_report(NULL, 2);
 
 -- Category Revenue Report for Restaurant 1
 EXEC category_revenue_report('R1');
+EXEC category_revenue_report(NULL, 2);
+
 */
 
 DELETE FROM product WHERE code = 'R1PIZ004';
 
 BEGIN
---     Create new product
-    setup_product(
-            'R1PIZ004',
-            'BBQ Chicken Pizza',
-            'Grilled chicken, BBQ sauce, red onions, cilantro',
-            'Size:Small,Medium,Large|Crust:Thin,Pan,Stuffed|Spice:Mild,Medium,Hot|Sauce:BBQ,Original,Ranch',
-            2
-    );
-
---     Create the Premium Toppings group with at least one feature
-    add_feature_group_to_product('R1PIZ004', 'Premium Toppings', 'Extra Chicken');
-
---     Add more features to the existing Premium Toppings group
-    add_feature_to_group('R1PIZ004', 'Extra Bacon', NULL, 'Premium Toppings');
-    add_feature_to_group('R1PIZ004', 'Extra Cheese', NULL, 'Premium Toppings');
-    add_feature_to_group('R1PIZ004', 'Extra Jalapenos', NULL, 'Premium Toppings');
-
---     Add a new feature group
-    add_feature_group_to_product('R1PIZ004', 'Cheese Type', 'Mozzarella,Cheddar,Parmesan,Blue Cheese');
-
---     Assign to category
-    INSERT INTO product_category_classification (product_id, product_category_id, from_date, is_primary)
-    VALUES (
-               (SELECT id FROM product WHERE code = 'R1PIZ004'),
-               (SELECT id FROM product_category WHERE name = 'NonVeg Pizzas' AND created_by_id = 2),
-               CURRENT_TIMESTAMP,
-               TRUE
-           );
-
-    feature_popularity_report('R1');
-    category_revenue_report('R1');
+-- --     Create new product
+--     setup_product(
+--             'R1PIZ004',
+--             'BBQ Chicken Pizza',
+--             'Grilled chicken, BBQ sauce, red onions, cilantro',
+--             'Size:Small,Medium,Large|Crust:Thin,Pan,Stuffed|Spice:Mild,Medium,Hot|Sauce:BBQ,Original,Ranch',
+--             2
+--     );
+-- 
+-- --     Create the Premium Toppings group with at least one feature
+--     add_feature_group_to_product('R1PIZ004', 'Premium Toppings', 'Extra Chicken');
+-- 
+-- --     Add more features to the existing Premium Toppings group
+--     add_feature_to_group('R1PIZ004', 'Extra Bacon', NULL, 'Premium Toppings');
+--     add_feature_to_group('R1PIZ004', 'Extra Cheese', NULL, 'Premium Toppings');
+--     add_feature_to_group('R1PIZ004', 'Extra Jalapenos', NULL, 'Premium Toppings');
+-- 
+-- --     Add a new feature group
+--     add_feature_group_to_product('R1PIZ004', 'Cheese Type', 'Mozzarella,Cheddar,Parmesan,Blue Cheese');
+-- 
+-- --     Assign to category
+--     INSERT INTO product_category_classification (product_id, product_category_id, from_date, is_primary)
+--     VALUES (
+--                (SELECT id FROM product WHERE code = 'R1PIZ004'),
+--                (SELECT id FROM product_category WHERE name = 'NonVeg Pizzas' AND created_by_id = 2),
+--                CURRENT_TIMESTAMP,
+--                TRUE
+--            );
+-- 
+--     feature_popularity_report('R1');
+--     category_revenue_report('R1');
 END;
 /
 

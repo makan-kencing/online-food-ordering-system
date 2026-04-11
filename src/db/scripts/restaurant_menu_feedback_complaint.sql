@@ -17,6 +17,15 @@ GROUP BY r.id, r.name, mig.name;
 /*SELECT * FROM restaurant_category_performance
 ORDER BY restaurant_name, total_items DESC;*/
 
+/*SET LINESIZE 120
+SET PAGESIZE 50
+
+    COLUMN restaurant_name FORMAT A25
+    COLUMN category FORMAT A20
+SELECT *
+FROM restaurant_category_performance
+ORder By restaurant_name, total_items DESC;*/
+
 -- Queries - 2 
 -- Product performance per feedback, to check which product have low rating or many reported issues
 CREATE OR REPLACE VIEW product_feedback_performance AS
@@ -33,6 +42,15 @@ GROUP BY p.id, p.name;
 
 /*SELECT * FROM product_feedback_performance
     ORDER BY product_name;*/
+
+/*SET LINESIZE 120
+SET PAGESIZE 50
+
+    COLUMN product_name FORMAT A35
+    COLUMN average_rating FORMAT 999.99
+SELECT *
+FROM product_feedback_performance
+Order by product_name;*/
 
 -- Procedure - 1
 -- Add menu item
@@ -88,6 +106,7 @@ EXCEPTION
         ROLLBACK;
         RAISE;
 END;
+/
     
 -- EXEC proc_add_menu_item('Ice Cream Sundae', 'Pizzas', 3);
 -- COMMIT;
@@ -108,15 +127,6 @@ BEGIN
 
     IF v_exists = 0 THEN
         RAISE_APPLICATION_ERROR(-20001, 'Feedback ID does not exist.');
-    END IF;
-
-    SELECT COUNT(*)
-    INTO v_image_count
-    FROM feedback_image
-    WHERE feedback_id = p_feedback_id;
-
-    IF v_image_count >= 3 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'This feedback already has 3 images. Cannot add more.');
     END IF;
 
     INSERT INTO feedback_image (
@@ -143,7 +153,7 @@ EXCEPTION
 END;
 /
 
--- EXEC proc_add_feedback_image(1, 'test.png');
+-- EXEC proc_add_feedback_image(2, 'test.png');
 commit;
 
 -- Trigger - 1
@@ -318,7 +328,7 @@ commit;
 
 -- EXEC proc_menu_revenue_report;        //invalid: no input
 -- EXEC proc_menu_revenue_report(x);     //invalid: wrong input
--- EXEC proc_menu_detailed_report(1);    //display restaurant revenue
+-- EXEC proc_menu_revenue_report(1);    //display restaurant revenue
 
 -- Report - 2
 -- Display a restaurant feedback by menu item group
@@ -342,8 +352,6 @@ CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_report (
         WHERE mi.restaurant_id = p_restaurant_id
         ORDER BY mig.name;
 
-    rec_group cur_groups%ROWTYPE;
-
     CURSOR cur_items(p_group_id NUMBER) IS
         SELECT p.name AS item_name,
                ROUND(AVG(f.rating),2) AS avg_rating,
@@ -358,6 +366,7 @@ CREATE OR REPLACE PROCEDURE proc_feedback_menu_item_report (
         GROUP BY p.name
         ORDER BY p.name;
 
+    rec_group cur_groups%ROWTYPE;
     rec_item cur_items%ROWTYPE;
 
 BEGIN
@@ -383,7 +392,7 @@ BEGIN
 
     -- Header
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
-    DBMS_OUTPUT.PUT_LINE(LPAD('FEEDBACK SUMMARY BY MENU ITEM GROUP', v_line_width/2 + 17, '‎'));
+    DBMS_OUTPUT.PUT_LINE(LPAD('MENU ITEM FEEDBACK SUMMARY REPORT', v_line_width/2 + 17, '‎'));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', v_line_width, '='));
     DBMS_OUTPUT.PUT_LINE('Restaurant: ' || v_restaurant_name);
     DBMS_OUTPUT.PUT_LINE(RPAD('-', v_line_width, '-'));
@@ -450,8 +459,8 @@ BEGIN
 END;
 /
 
--- EXEC proc_feedback_menu_item_by_restaurant(5);   //display specific restaurant
--- EXEC proc_feedback_menu_item_by_restaurant(0);   //display invalid restaurant
+-- EXEC proc_feedback_menu_item_report(5);   //display specific restaurant
+-- EXEC proc_feedback_menu_item_report(0);   //display invalid restaurant
 
 commit;
 -- =========================
