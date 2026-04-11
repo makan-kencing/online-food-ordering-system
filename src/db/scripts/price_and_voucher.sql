@@ -394,6 +394,7 @@ end;
 begin
     report_product_and_features_price_changes(1);
 end;
+/
 
 create procedure report_top_performing_voucher(p_year in int) as
     cursor yearly_voucher_cur(year int) is
