@@ -25,16 +25,16 @@ GROUP BY m.id, m.username;
 -- ORDER BY Subscription_Status ASC, Latest_Expiry DESC;
 --
 -- -- Queries -2
--- -- check the nearby expired membership subscription of each member
--- -- (will check the subscription data that nearby the expired date one week)
--- CREATE VIEW VW_UPCOMING_EXPIRATIONS AS
--- SELECT
---     m.username,
---     m.email,
---     sub.thru_date
--- FROM member m
--- JOIN monthly_subscription sub ON m.id = sub.member_id
--- WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
+-- check the nearby expired membership subscription of each member
+-- (will check the subscription data that nearby the expired date one week)
+CREATE VIEW VW_UPCOMING_EXPIRATIONS AS
+SELECT
+    m.username,
+    m.email,
+    sub.thru_date
+FROM member m
+JOIN monthly_subscription sub ON m.id = sub.member_id
+WHERE sub.thru_date BETWEEN CURRENT_DATE  AND (CURRENT_DATE + INTERVAL '7' DAY);
 /
 
 -- COLUMN username FORMAT A20;
@@ -136,24 +136,37 @@ EXCEPTION
         RAISE;
 END;
 /
---EXEC proc_subscribe_member(55,1, 10, 1);
+--EXEC proc_subscribe_member(898,1, 20, 1);
 
 --PROCEDURE -2 :proc_upgrade_membership
-create or replace procedure proc_upgrade_current_membership(
-    v_member_id IN MEMBER.ID%type,
+CREATE OR REPLACE PROCEDURE proc_upgrade_current_membership(
+    v_member_id             IN MEMBER.ID%type,
     v_upgrade_membership_id IN MEMBERSHIP.ID%type,
-    v_paid_amount IN PAYMENT.AMOUNT%type,
-    v_payment_method_id IN PAYMENT_METHOD.ID%type
+    v_paid_amount           IN PAYMENT.AMOUNT%type,
+    v_payment_method_id     IN PAYMENT_METHOD.ID%type
 ) AS
-    v_old_membership_id MEMBERSHIP.ID%type;
-    v_old_membership_value MEMBERSHIP.PRICE%type;
-    v_new_membership_value MEMBERSHIP.PRICE%type;
-
-    v_payment_id PAYMENT.ID%type;
+    v_target_sub_id        MONTHLY_SUBSCRIPTION.ID%type;
+    v_old_price            MEMBERSHIP.PRICE%type;
+    v_new_price            MEMBERSHIP.PRICE%type;
+    v_payment_id           PAYMENT.ID%type;
+    v_upgrade_check        NUMBER;
 BEGIN
+    SELECT COUNT(*)
+    INTO v_upgrade_check
+    FROM payment p
+    JOIN subscription_payment sp ON p.id = sp.payment_id
+    JOIN monthly_subscription s ON sp.monthly_subscription_id = s.id
+    WHERE s.member_id = v_member_id
+      AND p.payment_method_data LIKE '%UPGRADE_TOPUP%'
+      AND TRUNC(p.paid_at, 'MM') = TRUNC(SYSDATE, 'MM');
+
+    IF v_upgrade_check > 0 THEN
+        RAISE_APPLICATION_ERROR(-20035, 'Validation Error: You have already upgraded your membership this month.');
+    END IF;
+
     BEGIN
         SELECT s.id, m.price
-        INTO v_old_membership_id, v_old_membership_value
+        INTO v_target_sub_id, v_old_price
         FROM monthly_subscription s
         JOIN membership m ON s.membership_id = m.id
         WHERE s.member_id = v_member_id
@@ -161,52 +174,50 @@ BEGIN
           AND ROWNUM = 1;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20030, 'Error: No active subscription found to upgrade.');
+            RAISE_APPLICATION_ERROR(-20030, 'Error: No active subscription found for this member.');
     END;
 
-    BEGIN
-        SELECT price INTO v_new_membership_value
-        FROM membership
-        WHERE id = v_upgrade_membership_id;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-20031, 'Error: Target membership level does not exist.');
-    END;
+    SELECT price INTO v_new_price FROM membership WHERE id = v_upgrade_membership_id;
 
-    IF v_new_membership_value - v_old_membership_value <= 0 THEN
-        RAISE_APPLICATION_ERROR(-20033, 'Error: Target level must be higher than current level.');
+    IF v_new_price <= v_old_price THEN
+        RAISE_APPLICATION_ERROR(-20033, 'Error: Target level price must be higher than current.');
     END IF;
 
-    IF v_paid_amount != v_new_membership_value - v_old_membership_value THEN
-        RAISE_APPLICATION_ERROR(-20032,
-            'Error: Incorrect top-up amount. Expected difference: ' || v_new_membership_value - v_old_membership_value ||
-            ' (Target ' || v_new_membership_value || ' - Current ' || v_old_membership_value || ')');
+    IF v_paid_amount != (v_new_price - v_old_price) THEN
+        RAISE_APPLICATION_ERROR(-20032, 'Error: Amount RM' || v_paid_amount || ' does not match required RM' || (v_new_price - v_old_price));
     END IF;
 
     INSERT INTO payment (amount, payment_method_id, ref_no, payment_method_data)
     VALUES (
         v_paid_amount,
         v_payment_method_id,
-        'UPGR-DIFF-' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || v_member_id,
-        '{"action": "UPGRADE_TOPUP", "from_price": ' || v_old_membership_value || ', "to_price": ' || v_new_membership_value || '}'
+        'UPG-' || v_member_id || '-' || TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
+        '{"action": "UPGRADE_TOPUP", "old_id": ' || v_target_sub_id || '}'
     )
     RETURNING id INTO v_payment_id;
 
     INSERT INTO SUBSCRIPTION_PAYMENT(monthly_subscription_id, payment_id)
-    VALUES (v_payment_id, v_old_membership_id);
+    VALUES (v_target_sub_id, v_payment_id);
 
     UPDATE MONTHLY_SUBSCRIPTION
     SET MEMBERSHIP_ID = v_upgrade_membership_id
-    WHERE MEMBERSHIP_ID = v_old_membership_id;
+    WHERE ID = v_target_sub_id;
 
-    DBMS_OUTPUT.PUT_LINE('Top-up Success! Paid RM ' || v_paid_amount || ' to upgrade to level ' || v_upgrade_membership_id);
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20099, 'Critical Error: Update failed, check subscription ID.');
+    END IF;
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Upgrade Success! Membership updated to level ' || v_upgrade_membership_id);
+
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
         RAISE;
 END;
 /
---EXEC proc_upgrade_membership(59, 1, 50.00, 1);
+/
+--EXEC proc_upgrade_current_membership(898, 2, 15.00, 1);
 
 SELECT
     s.ID AS SUB_ID,
@@ -216,7 +227,7 @@ SELECT
     s.THRU_DATE
 FROM MONTHLY_SUBSCRIPTION s
 JOIN MEMBERSHIP m ON s.MEMBERSHIP_ID = m.ID
-WHERE s.MEMBER_ID = 113;
+WHERE s.MEMBER_ID = 898;
 /
 -- Trigger -1
 -- This trigger is one of the busness logic inside the system , one member address just can have one default address
