@@ -153,24 +153,47 @@ EXCEPTION
 END;
 /
 
--- EXEC proc_add_feedback_image(2, 'test.png');
+-- EXEC proc_add_feedback_image(5, 'test.png');
+
+/*
+begin
+     proc_add_feedback_image(7, 'test.png');
+end;
+/
+*/
+
 commit;
 
 -- Trigger - 1
 -- Ensure each feedback only has a limit of 3 feedback images
 CREATE OR REPLACE TRIGGER trg_feedback_image_limit
-    BEFORE INSERT ON feedback_image
-    FOR EACH ROW
-DECLARE
-    v_count NUMBER;
-BEGIN
-    SELECT COUNT(*) INTO v_count
-    FROM feedback_image
-    WHERE feedback_id = :NEW.feedback_id;
+    FOR INSERT ON feedback_image
+    COMPOUND TRIGGER
 
-    IF v_count >= 3 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'A feedback can have a maximum of 3 images.');
-    END IF;
+    TYPE t_feedback_ids IS TABLE OF feedback_image.feedback_id%TYPE;
+    v_feedback_ids t_feedback_ids := t_feedback_ids();
+
+BEFORE EACH ROW IS
+BEGIN
+    v_feedback_ids.EXTEND;
+    v_feedback_ids(v_feedback_ids.LAST) := :NEW.feedback_id;
+END BEFORE EACH ROW;
+
+    AFTER STATEMENT IS
+        v_count NUMBER;
+    BEGIN
+        FOR i IN 1 .. v_feedback_ids.COUNT LOOP
+                SELECT COUNT(*) INTO v_count
+                FROM feedback_image
+                WHERE feedback_id = v_feedback_ids(i);
+
+                IF v_count > 3 THEN
+                    RAISE_APPLICATION_ERROR(-20002,
+                                            'A feedback can have a maximum of 3 images.');
+                END IF;
+            END LOOP;
+    END AFTER STATEMENT;
+
 END;
 /
 
