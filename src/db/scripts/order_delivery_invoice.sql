@@ -159,9 +159,8 @@ DECLARE
     -- We only need a variable to catch the new order ID
     v_test_order_id orders.id%TYPE;
 BEGIN
-    DBMS_OUTPUT.PUT_LINE('--- TEST 1: SUCCESSFUL PAYMENT ---');
 
-    -- 1. Create a quick dummy order
+    -- 1. Create a order
     INSERT INTO orders (member_id, order_type, restaurant_id, ordered_at)
     VALUES (2, 1, 1, CURRENT_TIMESTAMP)
     RETURNING id INTO v_test_order_id;
@@ -170,7 +169,7 @@ BEGIN
     INSERT INTO order_item (order_id, product_id, quantity, unit_price)
     VALUES (v_test_order_id, 4, 2, 25.00);
 
-    -- 3. Call your procedure
+    -- 3. Call procedure
     -- Passing the new Order ID, Payment Method 2 (Card), and RM 50.00 Total
     proc_finalize_payment(
             p_order_id          => v_test_order_id,
@@ -252,7 +251,7 @@ END;
 /
 
 --PROCEDURE 2 TESTING
--- 1. Create the Order record
+-- Create the Order record
 DECLARE
     v_order_id   orders.id%TYPE;
     v_payment_id payment.id%TYPE;
@@ -335,7 +334,7 @@ BEGIN
     WHERE order_id = p_order_id
       AND order_item_id IS NOT NULL;
 
-    --Calculate Order-Level Adjustments
+    -- Calculate Order-Level Adjustments
     SELECT NVL(SUM(
        CASE
            WHEN adjustment_type = 1 THEN
@@ -390,7 +389,7 @@ BEGIN
     VALUES (v_order_id, 5, 1, 15.00)
     RETURNING id INTO v_item_2_id;
 
-    -- Math Checkpoint: Base Order Total is RM 65.00
+    -- Base Order Total is RM 65.00
 
     -- 3. Apply an Item-Level Adjustment
     -- 10% Discount on the Classic Cheeseburgers (Applies ONLY to v_item_1_id)
@@ -406,9 +405,9 @@ BEGIN
     INSERT INTO order_item_adjustment (order_id, adjustment_type, amount)
     VALUES (v_order_id, 5, 5.00);
 
-    -- Final Math Checkpoint: Expected Total is RM 65.00 (60.00 + 5.00)
+    -- Expected Total is RM 65.00 (60.00 + 5.00)
 
-    -- 5. Execute the Calculation
+    -- 5. Execute
     calculate_order_total(
             p_order_id    => v_order_id,
             p_total_price => v_calculated
@@ -438,7 +437,7 @@ DECLARE
     v_is_paid NUMBER;
     v_order_id orders.id%TYPE;
 BEGIN
-    --Determine which Order ID to check (handle delete via :OLD)
+    --Determine which Order ID to check (handle delete :OLD.order_id)
    IF DELETING THEN
        v_order_id := :OLD.order_id;
    ELSE
@@ -587,7 +586,7 @@ end;
 
 --REPORT 2
 --Report on the revenue and total orders for each states and their respective cities based on year, 
--- listing top 3 highest and lowest order to make sales decision accordingly
+--listing top 3 highest and lowest order to make sales decision accordingly
 CREATE OR REPLACE PROCEDURE proc_state_order_summary (
     p_year  IN NUMBER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
     p_month IN NUMBER DEFAULT EXTRACT(MONTH FROM CURRENT_DATE)
